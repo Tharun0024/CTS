@@ -371,13 +371,29 @@ class DecisionAgent:
 
     @staticmethod
     def _filter_canonical_claim(claim_dict: Dict[str, Any], required_keys: List[str]) -> Dict[str, Any]:
-        # Filter external/original claim to only include relevant fields matching required_keys
+        # Filter external/original claim to only include relevant fields matching required_keys.
+        # Preserve the current canonical contract (`case_data` + `evidence[]`) while still supporting
+        # legacy external payloads during migration.
         filtered = {
             "claim_id": claim_dict.get("claim_id"),
             "patient": claim_dict.get("patient"),
             "diagnoses": claim_dict.get("diagnoses"),
             "procedure": claim_dict.get("procedure"),
         }
+
+        if "case_data" in claim_dict:
+            filtered["case_data"] = claim_dict["case_data"]
+        if "evidence" in claim_dict:
+            evs = claim_dict["evidence"]
+            if isinstance(evs, list):
+                filtered_evs = [
+                    ev for ev in evs
+                    if isinstance(ev, dict)
+                    and any(rk.lower() in (ev.get("evidence_key") or "").lower() for rk in required_keys)
+                ]
+                if filtered_evs:
+                    filtered["evidence"] = filtered_evs
+
         for section in ["clinical_information", "treatment_history", "diagnostic_information"]:
             if section in claim_dict:
                 sec_dict = claim_dict[section]
@@ -400,17 +416,6 @@ class DecisionAgent:
                 ]
                 if filtered_docs:
                     filtered["documents"] = filtered_docs
-        if "case_data" in claim_dict:
-            filtered["case_data"] = claim_dict["case_data"]
-        if "evidence" in claim_dict:
-            evs = claim_dict["evidence"]
-            if isinstance(evs, list):
-                filtered_evs = [
-                    ev for ev in evs
-                    if isinstance(ev, dict) and any(rk.lower() in (ev.get("evidence_key") or "").lower() for rk in required_keys)
-                ]
-                if filtered_evs:
-                    filtered["evidence"] = filtered_evs
         return filtered
 
     @staticmethod
@@ -432,13 +437,38 @@ class DecisionAgent:
 
     @staticmethod
     def _get_relevant_candidates(claim_dict: Dict[str, Any], required_key: str) -> Dict[int, str]:
-        all_candidates = DecisionAgent._find_candidate_paths(claim_dict)
         relevant_candidates = {}
         idx = 1
-        for _, path in all_candidates.items():
-            if required_key.lower() in path.lower():
-                relevant_candidates[idx] = path
-                idx += 1
+
+        if "evidence" in claim_dict and isinstance(claim_dict["evidence"], list):
+            for i, item in enumerate(claim_dict["evidence"]):
+                if not isinstance(item, dict):
+                    continue
+                evidence_key = str(item.get("evidence_key") or "")
+                if required_key.lower() in evidence_key.lower():
+                    facts = item.get("extracted_facts") or {}
+                    if isinstance(facts, dict):
+                        for fact_key in facts:
+                            relevant_candidates[idx] = f"$.evidence[{i}].extracted_facts.{fact_key}"
+                            idx += 1
+                    else:
+                        relevant_candidates[idx] = f"$.evidence[{i}]"
+                        idx += 1
+
+        if "case_data" in claim_dict and isinstance(claim_dict["case_data"], dict):
+            metrics = claim_dict["case_data"].get("clinical_metrics") or {}
+            if isinstance(metrics, dict):
+                for metric_key in metrics:
+                    if required_key.lower() in metric_key.lower() or metric_key.lower() in required_key.lower():
+                        relevant_candidates[idx] = f"$.case_data.clinical_metrics.{metric_key}"
+                        idx += 1
+
+        if not relevant_candidates:
+            all_candidates = DecisionAgent._find_candidate_paths(claim_dict)
+            for _, path in all_candidates.items():
+                if required_key.lower() in path.lower():
+                    relevant_candidates[idx] = path
+                    idx += 1
         return relevant_candidates
 
     def evaluate_canonical_claim(
@@ -449,7 +479,7 @@ class DecisionAgent:
         The LLM supplies criterion-level explainability only. It cannot extract facts,
         mutate the canonical claim, or choose the final outcome.
         """
-        claim_id = canonical_claim.get("claim_id")
+        claim_id = canonical_claim.get("claim_id") or canonical_claim.get("case_data", {}).get("case_id")
         policy_id = rag_policy.get("policy_id")
         if not policy_id:
             matched_policies = rag_policy.get("matched_policies", [])
@@ -457,8 +487,19 @@ class DecisionAgent:
                 policy_id = matched_policies[0].get("policy_id")
         submission_attempt = canonical_claim.get("submission", {}).get("attempt")
 
-        mapped_claim = self._map_external_claim_to_legacy(canonical_claim)
-        mapped_policy = self._map_external_policy_to_legacy(rag_policy)
+        if "case_data" in canonical_claim and "evidence" in canonical_claim:
+            mapped_claim = {
+                "case_data": canonical_claim["case_data"],
+                "evidence": canonical_claim["evidence"],
+            }
+        else:
+            mapped_claim = self._map_external_claim_to_legacy(canonical_claim)
+
+        if "policy_id" in rag_policy and "criteria" in rag_policy:
+            mapped_policy = rag_policy
+        else:
+            mapped_policy = self._map_external_policy_to_legacy(rag_policy)
+
         claim = CanonicalClaim.model_validate(mapped_claim)
         policy = Policy.model_validate(mapped_policy)
         provider = self.llm_provider or NVIDIAProvider()
