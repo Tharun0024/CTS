@@ -1,5 +1,5 @@
 embedding_model: "BAAI/bge-base-en-v1.5"
-reranker_model: "BAAI/bge-reranker-v2-m3"
+reranker_model: "BAAI/bge-reranker-base"
 candidate_pool_size: 10
 final_policy_chunk_count: 3
 device: "cpu"

@@ -73,7 +73,7 @@ def main():
     if args.serve:
         print("\n=== STEP: STARTING FASTAPI TRIAGE SERVICE ===")
         # Run uvicorn on localhost port 8000
-        run_command("uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload")
+        run_command("uvicorn api.main:app --host 127.0.0.1 --port 8000")
         
     if not success:
         sys.exit(1)
