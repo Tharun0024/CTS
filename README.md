@@ -1,15 +1,15 @@
-﻿# CTS Hackathon
+CTS HACKATHON
 # Prior Authorization Claim Ingestion & Simulation Pipeline
 
 **Version 1**
 
-A clinical prior authorization (PA) simulation system that models the **Provider ↔ Payer trust boundary**. The pipeline ingests longitudinal clinical records, simulates PA scenarios, processes manual clinical PDFs, and produces normalized, decision-free payloads for downstream **RAG Retrievers** and **Decision Agents**.
+This system simulates the clinical prior authorization (PA) workflow under a strict **Provider ↔ Payer trust boundary**.
 
 ---
 
-## 1. Project Structure
+## 1. Directory Structure
 
-The project is organized as follows:
+All code, data files, and database outputs are self-contained in the project folder.
 
 ```text
 prior_auth_project/
@@ -18,16 +18,16 @@ prior_auth_project/
 │   └── Raw patient demographics spreadsheet
 │
 ├── clinical_events_PA_ids.csv
-│   └── Raw longitudinal clinical history
+│   └── Raw longitudinal clinical history CSV
 │
 ├── prior_authorization_policies.xlsx
 │   └── Insurer policy rules configuration
 │
 ├── big_patient_data.db
-│   └── Provider clinical database (SQLite)
+│   └── Provider Clinical Database (SQLite)
 │
 ├── payer_data.db
-│   └── Payer administrative database (SQLite)
+│   └── Payer Administrative Database (SQLite)
 │
 ├── Aetna_Knee_Arthroplasty_PA_Input.pdf
 │   └── Sample clinical patient PDF
@@ -35,113 +35,92 @@ prior_auth_project/
 ├── SC02_Missing_Documentation.pdf
 │   └── Scenario PDF
 │
-├── SC03...SC07 PDFs
-│   └── Additional scenario PDFs
+├── SC03 to SC07 PDFs
+│   └── Scenario PDFs
 │
 ├── pa_pipeline/
 │   │
 │   ├── database/
-│   │   ├── db_manager.py
-│   │   └── __init__.py
+│   │   └── db_manager.py
+│   │       └── Schema initialization, routing & database helpers
 │   │
 │   ├── ingestion/
 │   │   ├── ingest_data.py
-│   │   ├── manual_parser.py
-│   │   └── __init__.py
+│   │   │   └── Bulk clinical loader & Payer administrative generator
+│   │   │
+│   │   └── manual_parser.py
+│   │       └── Parses manual clinical patient PDFs into clinical tables
 │   │
 │   ├── simulation/
 │   │   ├── scenario_generator.py
-│   │   ├── simulation.py
-│   │   └── __init__.py
+│   │   │   └── Synthesizes clinical scenarios
+│   │   │
+│   │   └── simulation.py
+│   │       └── Standard simulation loop with random seed support
 │   │
 │   ├── transformation/
 │   │   ├── canonical_claim.py
-│   │   ├── rag_input.py
-│   │   └── __init__.py
+│   │   │   └── Exports normalized decision-free claims to output/
+│   │   │
+│   │   └── rag_input.py
+│   │       └── Exports context payloads to output/
 │   │
-│   ├── pipeline_main.py
-│   └── __init__.py
+│   └── pipeline_main.py
+│       └── Core CLI entry point
 │
 └── output/
     ├── canonical_claim_<id>.json
+    │   └── Consumed by Tharun's Decision Agent
+    │
     └── rag_input_<id>.json
+        └── Consumed by Thirumalai's RAG Retriever
 ```
 
 ---
 
-## 2. System Overview
+## 2. Requirements & Setup
 
-The pipeline simulates the clinical prior authorization workflow while maintaining a strict separation between provider and payer information.
+Make sure **Python 3** is installed.
 
-### Main workflow
-
-```text
-Clinical Records
-      │
-      ▼
-Data Ingestion
-      │
-      ▼
-Provider / Payer Databases
-      │
-      ▼
-Clinical Scenario Simulation
-      │
-      ▼
-Evidence Selection
-      │
-      ▼
-Canonical Claim
-      │
-      ├──────────────► RAG Input
-      │
-      └──────────────► Decision Agent
-```
-
-The system produces **decision-free normalized payloads** rather than making the final authorization decision.
-
----
-
-## 3. Requirements
-
-### Python
-
-Python 3 or later is required.
-
-### Install Dependencies
-
-From the project directory:
+Navigate to the project directory:
 
 ```powershell
 cd C:\Users\swaro\Downloads\prior_auth_project
+```
+
+Install the required dependencies:
+
+```powershell
 pip install pandas openpyxl pdfplumber
 ```
 
 ---
 
-## 4. Running the Pipeline
+## 3. How to Run the Pipeline
 
-All major operations are controlled through:
+The pipeline is controlled through the central CLI entry point:
 
 ```text
 pa_pipeline/pipeline_main.py
 ```
 
-### 4.1 Ingest Raw Data
+### 3.1 Ingest Raw Spreadsheets
 
-Run the ingestion process once to initialize and populate the databases:
+Run this once to set up the databases.
+
+This loads and structures provider clinical events into normalized tables and independently initializes/populates the synthetic payer administrative dataset in `payer_data.db`.
+
+The payer dataset is **not a copy or transformation of the provider's complete clinical record**.
 
 ```powershell
 python pa_pipeline/pipeline_main.py ingest
 ```
 
-This process loads the clinical records into normalized provider tables and initializes the synthetic payer administrative dataset.
-
 ---
 
-### 4.2 Run a Simulation for a Specific Patient
+### 3.2 Run Deterministic Simulation for a Specific Patient
 
-Example:
+This simulates clinical facts, writes them to the correct normalized tables, applies sensitivity/provenance metadata, and submits Attempt 1.
 
 ```powershell
 python pa_pipeline/pipeline_main.py run-simulation --patient-id PA045 --scenario-type EVIDENCE_OMITTED
@@ -158,122 +137,104 @@ EVIDENCE_OMITTED
 
 ---
 
-### 4.3 Run a Seeded Simulation Sequence
+### 3.3 Run a Simulation Sequence with a Seed
 
-For demonstrations and reproducible testing:
+For demonstrations, the pipeline can cycle through a set number of random patients using a reproducible seeded random index.
 
 ```powershell
 python pa_pipeline/pipeline_main.py run-simulation --limit 5 --interval-seconds 3 --seed 123
 ```
 
-The seed ensures reproducibility across simulation runs.
-
 ---
 
-### 4.4 Process a Manual Clinical PDF
+### 3.4 Process a Manual Clinical Patient PDF
 
-To process a manually submitted clinical patient PDF:
+The manual parser extracts patient demographics, CPT codes, and conservative treatment records directly from a clinical PDF and generates the outputs immediately.
 
 ```powershell
 python pa_pipeline/pipeline_main.py process-manual --file Aetna_Knee_Arthroplasty_PA_Input.pdf
 ```
 
-The parser extracts relevant patient information, CPT codes, and conservative treatment records and writes the resulting information into the appropriate database structures.
-
 ---
 
-# 5. Provider ↔ Payer Trust Boundary
+# 4. Trust Boundary & Database Layout
 
-The system maintains separate provider and payer databases.
+To enforce the **Provider ↔ Payer trust boundary**, the datasets are kept physically separate.
 
 ```text
-┌──────────────────────────────┐
-│       PROVIDER SYSTEM        │
-│                              │
-│    big_patient_data.db       │
-│                              │
-│  • patients                  │
-│  • encounters                │
-│  • conditions                │
-│  • observations              │
-│  • procedures                │
-│  • medications               │
-│  • allergies                 │
-│  • diagnostic_reports        │
-│  • clinical_documents        │
-│  • care_plans                │
-│  • evidence                  │
-└──────────────┬───────────────┘
-               │
-               │ Selected Evidence
-               ▼
-       ┌──────────────────┐
-       │ Canonical Claim  │
-       └────────┬─────────┘
-                │
-                ▼
-        Agent 1 / RAG
-               
-┌──────────────────────────────┐
-│         PAYER SYSTEM         │
-│                              │
-│       payer_data.db          │
-│                              │
-│  • members                   │
-│  • eligibility               │
-│  • payer_claims              │
-│  • prior_authorizations      │
-│  • utilization               │
-│  • benefits                  │
-└──────────────────────────────┘
+    [PROVIDER SYSTEM]                         [PAYER SYSTEM]
+┌──────────────────────────┐             ┌─────────────────────────┐
+│ big_patient_data.db      │             │ payer_data.db           │
+│ Full Longitudinal Care   │             │ Eligibility & Claims    │
+│                          │             │                         │
+│ • conditions             │             │ • members               │
+│ • observations           │             │ • eligibility           │
+│ • procedures             │             │ • payer_claims           │
+│ • diagnostic_reports     │             │ • prior_authorizations  │
+│ • evidence (with tags)   │             │ • benefits              │
+└────────────┬─────────────┘             └────────────┬────────────┘
+             │                                        │
+             │ Selects Evidence                       │ Mapped Member
+             ▼                                        ▼
+       ┌──────────────────────────────────────────────────┐
+       │              Canonical Claim                      │
+       │              Submitted Evidence Only              │
+       └────────────────────────┬─────────────────────────┘
+                                │
+                                ▼
+                         [Agent 1 / RAG]
 ```
-
-The payer system cannot directly query the provider's complete clinical database.
 
 ---
 
-## 6. Provider Database
+## 4.1 Provider Database
 
 ### `big_patient_data.db`
 
-The provider database represents the longitudinal clinical record.
+Represents the longitudinal hospital record.
 
-| Table                | Purpose                                                   |
-| -------------------- | --------------------------------------------------------- |
-| `patients`           | Patient demographics                                      |
-| `encounters`         | Patient visit events                                      |
-| `conditions`         | Diagnoses and onset tracking                              |
-| `observations`       | Tests, clinical values, and units                         |
-| `procedures`         | Surgical recommendations and conservative therapies       |
-| `medications`        | Active prescriptions and dosages                          |
-| `allergies`          | Allergens, reactions, and severity                        |
-| `diagnostic_reports` | Imaging files, findings, and dates                        |
-| `clinical_documents` | Progress notes and clinical text                          |
-| `care_plans`         | Longitudinal treatment plans                              |
-| `evidence`           | Evidence entries with sensitivity and provenance metadata |
+Tables include:
+
+| Table                | Description                                                                   |
+| -------------------- | ----------------------------------------------------------------------------- |
+| `patients`           | Demographics                                                                  |
+| `encounters`         | Patient visit events                                                          |
+| `conditions`         | Diagnoses and onset tracking                                                  |
+| `observations`       | Tests, clinical values, and units                                             |
+| `procedures`         | Surgical recommendations and conservative therapies                           |
+| `medications`        | Active prescriptions and dosages                                              |
+| `allergies`          | Allergens, reactions, and severity                                            |
+| `diagnostic_reports` | Imaging files, findings, and dates                                            |
+| `clinical_documents` | Progress notes and clinical text                                              |
+| `care_plans`         | Longitudinal patient treatment plans                                          |
+| `evidence`           | Mapped evidence entries with sensitivity tags and structured provenance links |
 
 ---
 
-## 7. Payer Database
+## 4.2 Payer Database
 
 ### `payer_data.db`
 
-The payer database contains insurer administrative information.
+Represents insurer administrative history.
 
-| Table                  | Purpose                                            |
-| ---------------------- | -------------------------------------------------- |
-| `members`              | Authoritative membership details                   |
-| `eligibility`          | Network verification and active ranges             |
-| `payer_claims`         | Previously submitted billing claims                |
-| `prior_authorizations` | Previous PA request decisions                      |
-| `utilization`          | Prior service and duplicate-use counts             |
-| `benefits`             | Coverage categories and authorization requirements |
+**Payer agents cannot query the provider database directly.**
+
+Tables include:
+
+| Table                  | Description                                                          |
+| ---------------------- | -------------------------------------------------------------------- |
+| `members`              | Authoritative membership details                                     |
+| `eligibility`          | Network verification and active ranges                               |
+| `payer_claims`         | Billing claims previously filed to the health plan                   |
+| `prior_authorizations` | Previous PA request decisions                                        |
+| `utilization`          | Counts of prior services and duplicate patterns                      |
+| `benefits`             | Covered categories, authorization requirements, and frequency limits |
 
 ---
 
-# 8. Dynamic Policy Selection
+# 5. Dynamic Policy Selection
 
-Medical policy selection follows:
+The medical policy is dynamically selected using:
 
 ```text
 Payer
@@ -293,66 +254,70 @@ Policy Mapping
 Policy ID
 ```
 
-The system supports payer-specific policy mappings.
+Aetna procedures map to **Clinical Policy Bulletins (CPBs)**.
 
-For example:
+Example:
 
 ```text
-Aetna
-  └── Clinical Policy Bulletin (CPB)
+CPB-0660
+```
 
-Medicare / CMS
-  └── LCD / NCD
+Medicare/CMS procedures map to **Local/National Coverage Determinations (LCDs/NCDs)**.
+
+Example:
+
+```text
+LCD-L35074
 ```
 
 ---
 
-# 9. Supported Clinical Domains
+# 6. Supported Clinical Domains
 
 The simulation framework supports eight clinical domains:
 
-1. **Orthopedics**
+### 1. Orthopedics
 
-   * Knee Osteoarthritis
-   * Rheumatoid Arthritis
-   * Avascular Necrosis
+* Knee Osteoarthritis
+* Rheumatoid Arthritis
+* Avascular Necrosis
 
-2. **Hip / Joint Replacement**
+### 2. Hip / Joint Replacement
 
-   * Hip Osteoarthritis
+* Hip Osteoarthritis
 
-3. **Spine**
+### 3. Spine
 
-   * Spinal stenosis
-   * Degenerative spine disease
+* Spinal stenosis
+* Degenerative spine disease
 
-4. **Imaging**
+### 4. Imaging
 
-   * Breast MRI
-   * Spine MRI
-   * Chest CT
+* Breast MRI
+* Spine MRI
+* Chest CT
 
-5. **Obesity**
+### 5. Obesity
 
-   * Bariatric Surgery
+* Bariatric Surgery
 
-6. **Sleep Medicine**
+### 6. Sleep Medicine
 
-   * Continuous Positive Airway Pressure (CPAP)
+* Continuous Positive Airway Pressure (CPAP)
 
-7. **Cardiology**
+### 7. Cardiology
 
-   * Cardiac Catheterization
+* Cardiac Catheterization
 
-8. **Neurology**
+### 8. Neurology
 
-   * Electroencephalography (EEG)
+* Electroencephalography (EEG)
 
 ---
 
-# 10. Multi-Attempt Resubmission Flow
+# 7. Multi-Attempt Resubmission Flow
 
-The system supports multiple PA submission attempts.
+Attempt 1 is completely **immutable** and is never overwritten by Attempt 2.
 
 ```text
 Attempt 1
@@ -372,18 +337,15 @@ Attempt 2
 (Released Evidence)
 ```
 
-### Attempt 1
+In Attempt 2, the Canonical Claim tracks newly released evidence in the `new_evidence_delta` array.
 
-Attempt 1 is immutable and is never overwritten.
-
-### Attempt 2
-
-Newly released evidence is represented through:
+Example:
 
 ```json
 {
   "submission": {
-    "attempt": 2
+    "attempt": 2,
+    "submitted_at": "2026-08-14T22:16:35Z"
   },
   "new_evidence_delta": [
     "EV-51A3F6"
@@ -393,44 +355,46 @@ Newly released evidence is represented through:
 
 ---
 
-# 11. Safe Sensitivity Escrow
+# 8. Safe Sensitivity Escrow
 
 Evidence is classified into six categories:
 
-| Category                  | Release Behavior               |
-| ------------------------- | ------------------------------ |
-| `ROUTINE`                 | Eligible for automatic release |
-| `PROTECTED_MENTAL_HEALTH` | Controlled release             |
-| `PROTECTED_SUBSTANCE_USE` | Controlled release             |
-| `PROTECTED_HIV`           | Controlled release             |
-| `PROTECTED_GENETIC`       | Controlled release             |
-| `UNKNOWN`                 | Escalates to human review      |
+| Evidence Category         | Handling                                |
+| ------------------------- | --------------------------------------- |
+| `ROUTINE`                 | Eligible for automatic release          |
+| `PROTECTED_MENTAL_HEALTH` | Controlled release                      |
+| `PROTECTED_SUBSTANCE_USE` | Controlled release                      |
+| `PROTECTED_HIV`           | Controlled release                      |
+| `PROTECTED_GENETIC`       | Controlled release                      |
+| `UNKNOWN`                 | Escalates automatically to human review |
 
-### Release Logic
+### Deterministic Release Rules
 
 ```text
-Evidence
-   │
-   ▼
+Evidence Item
+      │
+      ▼
 Check Sensitivity
-   │
-   ├── ROUTINE
-   │      └── RELEASE
-   │
-   ├── PROTECTED_*
-   │      └── CONTROLLED
-   │
-   └── UNKNOWN
-          └── ESCALATE / HUMAN REVIEW
+      │
+      ├── ROUTINE
+      │      └── RELEASE
+      │
+      ├── PROTECTED_*
+      │      └── CONTROLLED
+      │
+      └── UNKNOWN
+             └── ESCALATE / HUMAN REVIEW
 ```
 
 ---
 
-# 12. Canonical Claim Output
+# 9. Downstream Integration Contracts
 
-The canonical claim is a normalized, decision-free representation of the PA request.
+## 9.1 Canonical Claim JSON
 
-Example structure:
+The generated canonical claim is a normalized, decision-free claim.
+
+Example:
 
 ```json
 {
@@ -449,7 +413,8 @@ Example structure:
     },
     "requested_service": {
       "code": "27447",
-      "description": "Total knee arthroplasty (TKA), right knee"
+      "description": "Total knee arthroplasty (TKA), right knee",
+      "service_date": "2026-08-14"
     },
     "diagnoses": [
       {
@@ -457,17 +422,35 @@ Example structure:
         "description": "Knee Osteoarthritis"
       }
     ],
-    "clinical_facts": [],
-    "supporting_evidence": [],
+    "clinical_facts": [
+      {
+        "type": "diagnosis",
+        "code": "M17.11",
+        "value": "Diagnosis: Primary osteoarthritis of right knee (M17.11) ..."
+      }
+    ],
+    "supporting_evidence": [
+      {
+        "evidence_id": "EV-BF93BC",
+        "type": "DIAGNOSIS",
+        "reference": "Diagnosis: Primary osteoarthritis...",
+        "sensitivity": "ROUTINE",
+        "provenance": {
+          "source_type": "conditions",
+          "source_record_id": "45925"
+        }
+      }
+    ],
     "submission": {
-      "attempt": 1
+      "attempt": 1,
+      "submitted_at": "2026-08-14T22:16:12Z"
     },
     "new_evidence_delta": []
   }
 }
 ```
 
-Output files are generated as:
+Output:
 
 ```text
 output/
@@ -476,35 +459,36 @@ output/
 
 ---
 
-# 13. RAG Input
+## 9.2 RAG Input JSON
 
-The RAG input contains the policy context and clinical information required by the downstream retrieval system.
+The RAG input contains the information required by the downstream RAG Retriever.
 
 Example:
 
 ```json
 {
   "claim_id": "CLM-DD180B",
-  "patient_id": "PA045",
-  "insurance": "Aetna",
-  "policy_context": {
-    "policy_id": "CPB-0660",
-    "policy_title": "Knee Arthroplasty Prior Authorization CPB",
-    "domain": "Orthopedics",
-    "sub_domain": "Knee Osteoarthritis"
+  "insurance": {
+    "primary": {
+      "payer": "Aetna",
+      "policy_id": "CPB-0660"
+    }
   },
-  "domain": "orthopedics",
-  "condition": "knee_osteoarthritis",
+  "diagnosis": [
+    {
+      "code": "M17.11",
+      "description": "Knee Osteoarthritis"
+    }
+  ],
   "procedure": {
     "code": "27447",
     "description": "Total knee arthroplasty (TKA), right knee"
   },
-  "clinical_facts": [],
-  "policy_questions": []
+  "clinical_domain": "orthopedics"
 }
 ```
 
-Output files are generated as:
+Output:
 
 ```text
 output/
@@ -513,111 +497,60 @@ output/
 
 ---
 
-# 14. Downstream Integration
+# 10. Automated Validation Suite
 
-The generated payloads are intended for downstream systems:
-
-```text
-                 PA Pipeline
-                      │
-          ┌───────────┴───────────┐
-          ▼                       ▼
- Canonical Claim              RAG Input
-          │                       │
-          ▼                       ▼
- Decision Agent              RAG Retriever
-```
-
-The pipeline itself remains **decision-free**.
-
----
-
-# 15. Validation Suite
-
-An automated validation suite is used to verify the pipeline.
-
-The validation checks include:
-
-* Provider schema integrity
-* Payer schema isolation
-* Provider ↔ Payer trust boundary enforcement
-* Canonical claim evidence constraints
-* Dynamic policy and condition overrides
-* Dynamic RAG inputs
-* Seeded simulation determinism
-* Resubmission immutability
-* Sensitivity release constraints
-* Support for all eight clinical domains
-* Ingestion idempotency
-
-The validation suite is located at:
+An automated test suite is provided in the repository under:
 
 ```text
 C:\Users\swaro\.gemini\antigravity\brain\947570ef-18f4-4d52-bda9-c2e1bdc30720\scratch\test_version1.py
 ```
 
----
+The suite verifies:
 
-# 16. GitHub Setup
+* **Provider Schema Integrity**
 
-The `pa_pipeline` directory contains the Python source code and can be version-controlled independently.
+  * Demographics
+  * Encounters
+  * Conditions
+  * Evidence schemas
 
-Recommended repository structure:
+* **Payer Schema Isolation**
 
-```text
-prior_auth_project/
-│
-├── pa_pipeline/
-│   ├── database/
-│   ├── ingestion/
-│   ├── simulation/
-│   ├── transformation/
-│   ├── pipeline_main.py
-│   └── __init__.py
-│
-└── README.md
-```
+  * Separate member and plan eligibility definitions
 
-Large datasets such as `big_patient_data` should not be uploaded through the standard GitHub web uploader when they exceed GitHub's file-size limits.
+* **Trust Boundary Enforcement**
 
----
+  * No leak of clinical connection parameters or databases to downstream Agent 1 inputs
 
-# 17. Quick Start
+* **Canonical Claim Evidence Constraints**
 
-```powershell
-# Navigate to the project
-cd C:\Users\swaro\Downloads\prior_auth_project
+  * Only submitted evidence elements are included in the JSON output
 
-# Install dependencies
-pip install pandas openpyxl pdfplumber
+* **Dynamic Policy and Condition Overrides**
 
-# Ingest data
-python pa_pipeline/pipeline_main.py ingest
+  * Dynamic policy lookups for Aetna and CMS NCDs/LCDs
 
-# Run a simulation
-python pa_pipeline/pipeline_main.py run-simulation --patient-id PA045 --scenario-type EVIDENCE_OMITTED
+* **Dynamic RAG Inputs**
 
-# Run a seeded simulation
-python pa_pipeline/pipeline_main.py run-simulation --limit 5 --interval-seconds 3 --seed 123
+  * Non-hardcoded condition queries and case-specific questions across multiple domains
 
-# Process a manual PDF
-python pa_pipeline/pipeline_main.py process-manual --file Aetna_Knee_Arthroplasty_PA_Input.pdf
-```
+* **Seeded Arrival Determinism**
 
----
+  * Seeded reproducibility across simulation loops
 
-## 18. Project Objective
+* **Resubmission Immutability**
 
-The objective of this project is to provide a structured prior authorization simulation pipeline that:
+  * Attempt 1 preservation
+  * Attempt 2 resubmission delta computations
 
-* Ingests longitudinal clinical records
-* Maintains a strict Provider ↔ Payer separation
-* Simulates multiple clinical PA scenarios
-* Processes manually submitted clinical PDFs
-* Applies sensitivity and evidence-release rules
-* Dynamically maps cases to applicable policy contexts
-* Generates normalized canonical claims
-* Generates RAG-ready context payloads
-* Supports multi-attempt PA submissions
-* Provides deterministic simulation and validation capabilities
-* Keeps final authorization decisions within downstream decision systems
+* **Sensitivity Release Constraints**
+
+  * Safety checks for Routine and Escrow detours
+
+* **Eight Clinical Domains Support**
+
+  * Verification across all simulated patient categories
+
+* **Ingestion Idempotency**
+
+  * Duplicate-free database rebuilds
