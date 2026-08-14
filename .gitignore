@@ -1,0 +1,13 @@
+# Ignored local environments
+.env
+.env.local
+
+# Python files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+build/
+dist/
+*.egg-info/

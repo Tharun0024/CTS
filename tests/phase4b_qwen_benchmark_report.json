@@ -1,0 +1,244 @@
+{
+  "model": "qwen/qwen3.5-flash-02-23",
+  "case_count": 10,
+  "metrics": {
+    "successful_provider_runs": 4,
+    "provider_failures": 6,
+    "provider_success_rate": 0.4,
+    "decision_accuracy": 0.5,
+    "fact_extraction_accuracy": 1.0,
+    "fact_extraction_correct": 2,
+    "fact_extraction_expected": 2,
+    "hallucinated_facts": 1,
+    "false_approvals": 0,
+    "false_rejections": 1,
+    "correct_human_review": "0/2",
+    "correct_request_more_information": null,
+    "average_latency_seconds": 3.4684,
+    "maximum_latency_seconds": 6.569,
+    "structured_output_failures": 6
+  },
+  "cases": [
+    {
+      "id": "approval",
+      "expected_decision": "APPROVE",
+      "actual_decision": "APPROVE",
+      "provider_succeeded": true,
+      "decision_correct": true,
+      "expected_facts": {
+        "hba1c_report": {
+          "hba1c": 8.5
+        }
+      },
+      "actual_facts": {
+        "hba1c_report": [
+          {
+            "hba1c": 8.5
+          }
+        ]
+      },
+      "fact_correct": 1,
+      "fact_expected": 1,
+      "hallucinated_facts": 0,
+      "latency_seconds": 4.736,
+      "errors": []
+    },
+    {
+      "id": "rejection",
+      "expected_decision": "REJECT",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": false,
+      "decision_correct": false,
+      "expected_facts": {
+        "hba1c_report": {
+          "hba1c": 7.5
+        }
+      },
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 1.57,
+      "errors": [
+        "LLM Layer failed: decision_agent.llm_schemas.LLMStructuredResponse() argument after ** must be a mapping, not float"
+      ]
+    },
+    {
+      "id": "missing_evidence",
+      "expected_decision": "REQUEST_MORE_INFORMATION",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": false,
+      "decision_correct": false,
+      "expected_facts": {},
+      "actual_facts": {
+        "administrative_note": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 1.572,
+      "errors": [
+        "LLM Layer failed: decision_agent.llm_schemas.LLMStructuredResponse() argument after ** must be a mapping, not float"
+      ]
+    },
+    {
+      "id": "ambiguity",
+      "expected_decision": "HUMAN_REVIEW",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": false,
+      "decision_correct": false,
+      "expected_facts": {},
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 1.118,
+      "errors": [
+        "LLM Layer failed: decision_agent.llm_schemas.LLMStructuredResponse() argument after ** must be a mapping, not float"
+      ]
+    },
+    {
+      "id": "contradiction",
+      "expected_decision": "HUMAN_REVIEW",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": false,
+      "decision_correct": false,
+      "expected_facts": {},
+      "actual_facts": {
+        "hba1c_report": [
+          {},
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 3.705,
+      "errors": [
+        "LLM Layer failed: decision_agent.llm_schemas.LLMStructuredResponse() argument after ** must be a mapping, not float"
+      ]
+    },
+    {
+      "id": "low_confidence",
+      "expected_decision": "HUMAN_REVIEW",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": false,
+      "decision_correct": false,
+      "expected_facts": {},
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 4.827,
+      "errors": [
+        "LLM Layer failed: decision_agent.llm_schemas.LLMStructuredResponse() argument after ** must be a mapping, not float"
+      ]
+    },
+    {
+      "id": "unsupported_claim",
+      "expected_decision": "HUMAN_REVIEW",
+      "actual_decision": "REQUEST_MORE_INFORMATION",
+      "provider_succeeded": true,
+      "decision_correct": false,
+      "expected_facts": {},
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 3.354,
+      "errors": []
+    },
+    {
+      "id": "misleading_evidence",
+      "expected_decision": "HUMAN_REVIEW",
+      "actual_decision": "REJECT",
+      "provider_succeeded": true,
+      "decision_correct": false,
+      "expected_facts": {},
+      "actual_facts": {
+        "hba1c_report": [
+          {
+            "hba1c": 6.2
+          }
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 1,
+      "latency_seconds": 3.667,
+      "errors": []
+    },
+    {
+      "id": "prompt_injection",
+      "expected_decision": "APPROVE",
+      "actual_decision": "APPROVE",
+      "provider_succeeded": true,
+      "decision_correct": true,
+      "expected_facts": {
+        "hba1c_report": {
+          "hba1c": 8.5
+        }
+      },
+      "actual_facts": {
+        "hba1c_report": [
+          {
+            "hba1c": 8.5
+          }
+        ]
+      },
+      "fact_correct": 1,
+      "fact_expected": 1,
+      "hallucinated_facts": 0,
+      "latency_seconds": 3.566,
+      "errors": []
+    },
+    {
+      "id": "multiple_criteria",
+      "expected_decision": "APPROVE",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": false,
+      "decision_correct": false,
+      "expected_facts": {
+        "hba1c_report": {
+          "hba1c": 8.5
+        },
+        "bp_report": {
+          "systolic_bp": 150
+        }
+      },
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ],
+        "bp_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 6.569,
+      "errors": [
+        "LLM Layer failed: Unterminated string starting at: line 43 column 23 (char 1574)"
+      ]
+    }
+  ]
+}

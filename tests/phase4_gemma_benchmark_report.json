@@ -1,0 +1,239 @@
+{
+  "model": "google/gemma-4-26b-a4b-it:free",
+  "case_count": 10,
+  "metrics": {
+    "successful_provider_runs": 5,
+    "provider_failures": 5,
+    "decision_accuracy": 0.8,
+    "fact_extraction_accuracy": 1.0,
+    "fact_extraction_correct": 2,
+    "fact_extraction_expected": 2,
+    "hallucinated_facts": 1,
+    "false_approvals": 0,
+    "false_rejections": 0,
+    "correct_human_review": "1/2",
+    "correct_request_more_information": "1/1",
+    "average_latency_seconds": 38.976600000000005
+  },
+  "cases": [
+    {
+      "id": "approval",
+      "expected_decision": "APPROVE",
+      "actual_decision": "APPROVE",
+      "provider_succeeded": true,
+      "decision_correct": true,
+      "expected_facts": {
+        "hba1c_report": {
+          "hba1c": 8.5
+        }
+      },
+      "actual_facts": {
+        "hba1c_report": [
+          {
+            "hba1c": 8.5
+          }
+        ]
+      },
+      "fact_correct": 1,
+      "fact_expected": 1,
+      "hallucinated_facts": 0,
+      "latency_seconds": 30.486,
+      "errors": []
+    },
+    {
+      "id": "rejection",
+      "expected_decision": "REJECT",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": false,
+      "decision_correct": false,
+      "expected_facts": {
+        "hba1c_report": {
+          "hba1c": 7.5
+        }
+      },
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 2.354,
+      "errors": [
+        "LLM Layer failed: OpenRouter API Rate Limit Exceeded (429). Details: {\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-4-26b-a4b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\",\"provider_name\":\"Darkbloom\",\"is_byok\":false,\"provider_error_code\":\"rate_limit_exceeded\",\"limit_source\":\"upstream_provider_shared_pool\",\"remedy_hint\":\"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider routing: https://openrouter.ai/docs/features/provider-routing\",\"retry_after_seconds\":22,\"retry_after_seconds_raw\":22,\"previous_errors\":[{\"code\":429,\"message\":\"Provider returned error\",\"provider_name\":\"Google AI Studio\",\"raw\":\"google/gemma-4-26b-a4b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\"}]}},\"user_id\":\"user_38F6BP6Ha9KtHvWOSJrLmSqNLZR\"}"
+      ]
+    },
+    {
+      "id": "missing_evidence",
+      "expected_decision": "REQUEST_MORE_INFORMATION",
+      "actual_decision": "REQUEST_MORE_INFORMATION",
+      "provider_succeeded": true,
+      "decision_correct": true,
+      "expected_facts": {},
+      "actual_facts": {
+        "administrative_note": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 37.143,
+      "errors": []
+    },
+    {
+      "id": "ambiguity",
+      "expected_decision": "HUMAN_REVIEW",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": false,
+      "decision_correct": false,
+      "expected_facts": {},
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 29.272,
+      "errors": [
+        "LLM Layer failed: 1 validation error for LLMStructuredResponse\ncriterion_interpretations.0.supporting_evidence_ids.0\n  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type"
+      ]
+    },
+    {
+      "id": "contradiction",
+      "expected_decision": "HUMAN_REVIEW",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": false,
+      "decision_correct": false,
+      "expected_facts": {},
+      "actual_facts": {
+        "hba1c_report": [
+          {},
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 58.493,
+      "errors": [
+        "LLM Layer failed: Unterminated string starting at: line 51 column 7 (char 1566)"
+      ]
+    },
+    {
+      "id": "low_confidence",
+      "expected_decision": "HUMAN_REVIEW",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": false,
+      "decision_correct": false,
+      "expected_facts": {},
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 39.058,
+      "errors": [
+        "LLM Layer failed: 1 validation error for LLMStructuredResponse\ncriterion_interpretations.0.supporting_evidence_ids.0\n  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type"
+      ]
+    },
+    {
+      "id": "unsupported_claim",
+      "expected_decision": "HUMAN_REVIEW",
+      "actual_decision": "REQUEST_MORE_INFORMATION",
+      "provider_succeeded": true,
+      "decision_correct": false,
+      "expected_facts": {},
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 70.24,
+      "errors": []
+    },
+    {
+      "id": "misleading_evidence",
+      "expected_decision": "HUMAN_REVIEW",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": true,
+      "decision_correct": true,
+      "expected_facts": {},
+      "actual_facts": {
+        "hba1c_report": [
+          {
+            "hba1c": 6.2
+          }
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 1,
+      "latency_seconds": 38.062,
+      "errors": []
+    },
+    {
+      "id": "prompt_injection",
+      "expected_decision": "APPROVE",
+      "actual_decision": "APPROVE",
+      "provider_succeeded": true,
+      "decision_correct": true,
+      "expected_facts": {
+        "hba1c_report": {
+          "hba1c": 8.5
+        }
+      },
+      "actual_facts": {
+        "hba1c_report": [
+          {
+            "hba1c": 8.5
+          }
+        ]
+      },
+      "fact_correct": 1,
+      "fact_expected": 1,
+      "hallucinated_facts": 0,
+      "latency_seconds": 47.656,
+      "errors": []
+    },
+    {
+      "id": "multiple_criteria",
+      "expected_decision": "APPROVE",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": false,
+      "decision_correct": false,
+      "expected_facts": {
+        "hba1c_report": {
+          "hba1c": 8.5
+        },
+        "bp_report": {
+          "systolic_bp": 150
+        }
+      },
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ],
+        "bp_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 37.002,
+      "errors": [
+        "LLM Layer failed: Expecting value: line 1 column 1 (char 0)"
+      ]
+    }
+  ]
+}
