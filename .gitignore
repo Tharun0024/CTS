@@ -1,0 +1,24 @@
+# Local caches and model weights
+models/
+embeddings/
+vector_store/
+cache/
+checkpoints/
+logs/
+
+# API keys and credentials
+.env
+
+# Python build and testing artifacts
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# OS specific files
+.DS_Store
+Thumbs.db
