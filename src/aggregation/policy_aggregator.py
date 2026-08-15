@@ -64,8 +64,10 @@ class PolicyAggregator:
                 
             # Procedure code or domain compatibility check
             proc_compat = False
+            exact_proc_match = False
             if query_proc in chunk_procs:
                 proc_compat = True
+                exact_proc_match = True
             else:
                 # Range check
                 for cp in chunk_procs:
@@ -85,6 +87,10 @@ class PolicyAggregator:
                     if kw in policy_title:
                         boost += 0.15
                         break
+                
+                # Apply additional boost if the procedure code matched exactly rather than via a range
+                if exact_proc_match:
+                    boost += 0.10
                         
                 boosted_score = base_score + boost
                 

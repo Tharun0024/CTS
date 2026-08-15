@@ -2,6 +2,7 @@ import os
 import time
 import yaml
 import json
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import ValidationError
 from typing import Dict, Any
@@ -22,12 +23,6 @@ from src.llm.llm_client import LLMClient
 from src.llm.prompt_builder import PromptBuilder
 from src.validation.output_validator import OutputValidator
 
-app = FastAPI(
-    title="Generalized Prior Authorization Policy Retrieval RAG API",
-    description="A semantic policy search and structured criteria extraction engine.",
-    version="1.0.0"
-)
-
 # Global variables to cache loaded models and indexes
 CONFIG: Dict[str, Any] = {}
 ALL_CHUNKS: list = []
@@ -46,8 +41,8 @@ PROMPT_BUILDER: PromptBuilder = None
 OUTPUT_VALIDATOR: OutputValidator = None
 QUERY_BUILDER: QueryBuilder = None
 
-@app.on_event("startup")
-def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global CONFIG, ALL_CHUNKS, ALL_CHUNKS_DICT, EXACT_MATCHER, BGE_EMBEDDER
     global FAISS_RETRIEVER, BM25_RETRIEVER, CANDIDATE_POOL, BGE_RERANKER
     global POLICY_AGGREGATOR, DETERMINISTIC_ANALYZER, EVIDENCE_BUILDER
@@ -112,6 +107,14 @@ def startup_event():
     QUERY_BUILDER = QueryBuilder()
     
     print("RAG API initialization successfully completed.")
+    yield
+
+app = FastAPI(
+    title="Generalized Prior Authorization Policy Retrieval RAG API",
+    description="A semantic policy search and structured criteria extraction engine.",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
 @app.post("/triage", response_model=ClaimOutput)
 def triage(claim_input: ClaimInput, debug: bool = Query(False, description="Enable return of debug details in logs")):
@@ -171,7 +174,7 @@ def triage(claim_input: ClaimInput, debug: bool = Query(False, description="Enab
         )
         
         # 9. LLM Generation
-        prompt = PROMPT_BUILDER.build_prompt(norm_claim.dict(), evidence_object)
+        prompt = PROMPT_BUILDER.build_prompt(norm_claim.model_dump(), evidence_object)
         final_output = LLM_CLIENT.generate_claim_output(
             claim_id=norm_claim.claim_id,
             policy_id=selected_policy_id,

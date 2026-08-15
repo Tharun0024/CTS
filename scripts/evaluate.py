@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()  # Load .env early so HF_HUB_DISABLE_XET etc. are set before imports
+
 import time
 import json
 import yaml

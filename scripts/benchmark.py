@@ -158,7 +158,7 @@ def main():
     policy_id, aggregated, score = agg.aggregate(reranked, all_chunks, norm_claim.insurance.primary.payer, norm_claim.procedure.code, norm_claim.clinical_domain)
     ana_output = analyzer.analyze_chunks(aggregated)
     evidence = eb.build_evidence(policy_id, norm_claim.insurance.primary.payer, ana_output, aggregated)
-    prompt = prompt_builder.build_prompt(norm_claim.dict(), evidence)
+    prompt = prompt_builder.build_prompt(norm_claim.model_dump(), evidence)
     final_out = llm.generate_claim_output(norm_claim.claim_id, policy_id, norm_claim.insurance.primary.payer, score, evidence, prompt)
     cleaned = validator.filter_decision_fields(final_out)
     validator.validate(cleaned, policy_id)
@@ -227,7 +227,7 @@ def main():
         
         # 12. LLM Generation
         t_start = time.time()
-        prompt = prompt_builder.build_prompt(norm_claim.dict(), evidence)
+        prompt = prompt_builder.build_prompt(norm_claim.model_dump(), evidence)
         final_out = llm.generate_claim_output(norm_claim.claim_id, policy_id, norm_claim.insurance.primary.payer, score, evidence, prompt)
         latencies["llm_generation"].append((time.time() - t_start) * 1000)
         
