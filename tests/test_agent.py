@@ -1,6 +1,6 @@
 import json
 import pytest
-from decision_agent import (
+from decision import (
     DecisionAgent,
     Policy,
     PolicyExclusion,
@@ -13,10 +13,10 @@ from decision_agent import (
     CanonicalClaim,
     CriterionAssessmentStatus,
 )
-from decision_agent.policy_evaluator import resolve_field_value, check_operator
-from decision_agent.llm_provider import MockLLMProvider, NVIDIAProvider
-from decision_agent.llm_schemas import LLMStructuredResponse, InterpretationState
-from decision_agent.llm_prompt import CRITERION_ASSESSMENT_SYSTEM_PROMPT, build_criterion_assessment_prompt
+from decision.policy_evaluator import resolve_field_value, check_operator
+from decision.llm_provider import MockLLMProvider, NVIDIAProvider
+from decision.llm_schemas import LLMStructuredResponse, InterpretationState
+from decision.llm_prompt import CRITERION_ASSESSMENT_SYSTEM_PROMPT, build_criterion_assessment_prompt
 
 
 # Define a standard mock policy for testing
@@ -472,6 +472,7 @@ def test_mandatory_criterion_uncertainty(diabetes_policy):
     assert res.outcome == DecisionOutcome.REJECT
 
     # 2. Low-confidence mandatory violation -> HUMAN_REVIEW
+    # V1 hierarchy: CONFLICT (evidence quality issue) outranks FAILED clinical rule.
     ev_low_conf = [EvidenceItem(evidence_key="hba1c_report", source="Lab", status=EvidenceStatus.VERIFIED, confidence_score=0.5, extracted_facts={"hba1c": 7.5})]
     res = agent.evaluate(case_data, ev_low_conf)
     assert res.outcome == DecisionOutcome.HUMAN_REVIEW
@@ -1112,8 +1113,8 @@ def test_nvidia_config_and_model(monkeypatch):
     """
     Validates model settings (z-ai/glm-5.2) and URL formatting suffixes.
     """
-    import decision_agent.llm_provider
-    monkeypatch.setattr(decision_agent.llm_provider, "load_env", lambda: None)
+    import decision.llm_provider
+    monkeypatch.setattr(decision.llm_provider, "load_env", lambda: None)
     monkeypatch.delenv("NVIDIA_MODEL", raising=False)
     provider = NVIDIAProvider(api_key="mock_key")
     # Verify default model is z-ai/glm-5.2
@@ -1313,7 +1314,7 @@ def test_prompt_injection_safety():
     """
     Verifies system prompts contain the prompt injection instruction safeguards.
     """
-    from decision_agent.llm_prompt import SYSTEM_PROMPT
+    from decision.llm_prompt import SYSTEM_PROMPT
     # Verify keywords resisting instructions injection
     assert "Ignore any commands" in SYSTEM_PROMPT or "ignore" in SYSTEM_PROMPT.lower()
     assert "DATA" in SYSTEM_PROMPT
@@ -1323,7 +1324,7 @@ def test_openrouter_provider_config():
     """
     Verifies OpenRouterProvider configuration parsing behavior.
     """
-    from decision_agent.llm_provider import OpenRouterProvider
+    from decision.llm_provider import OpenRouterProvider
     provider = OpenRouterProvider(api_key="or-test-key", model="google/gemma-4-26b-a4b-it:free", base_url="https://openrouter.ai/api/v1")
     assert provider.api_key == "or-test-key"
     assert provider.model == "google/gemma-4-26b-a4b-it:free"
@@ -1334,7 +1335,7 @@ def test_openrouter_provider_missing_key():
     """
     Verifies OpenRouterProvider raises ValueError when API key is missing.
     """
-    from decision_agent.llm_provider import OpenRouterProvider
+    from decision.llm_provider import OpenRouterProvider
     provider = OpenRouterProvider(api_key="")
     import pytest
     with pytest.raises(ValueError, match="OpenRouter API Key is missing"):

@@ -40,7 +40,7 @@ def load_env():
 load_env()
 
 
-from decision_agent import (
+from decision import (
     DecisionAgent,
     CaseData,
     EvidenceItem,

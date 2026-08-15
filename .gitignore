@@ -13,7 +13,7 @@ dist/
 *.egg-info/
 
 # RAG local caches and model artifacts
-models/
+.cache/
 embeddings/
 vector_store/
 cache/

@@ -4,10 +4,10 @@ candidate_pool_size: 10
 final_policy_chunk_count: 3
 device: "cpu"
 paths:
-  models: "E:/RAG/models"
-  embeddings: "E:/RAG/embeddings"
-  vector_store: "E:/RAG/vector_store"
-  cache: "E:/RAG/cache"
-  raw_data: "E:/RAG/data/raw/ragdata.jsonl"
-  normalized_data: "E:/RAG/data/normalized/normalized_policies.json"
-  processed_chunks: "E:/RAG/data/processed/chunks.json"
+  models: "models"
+  embeddings: "data/embeddings"
+  vector_store: "data/vector_store"
+  cache: ".cache/hf"
+  raw_data: "data/raw/ragdata.jsonl"
+  normalized_data: "data/normalized/normalized_policies.json"
+  processed_chunks: "data/processed/chunks.json"

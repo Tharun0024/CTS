@@ -61,3 +61,44 @@ def test_api_validation_error(client):
     
     response = client.post("/triage", json=bad_claim)
     assert response.status_code == 422
+
+
+def test_api_evaluate_pacemaker(client):
+    # Valid canonical claim for pacemaker NCD-20.8.3
+    canonical_claim = {
+        "claim_id": "CLM-PACEMAKER-02",
+        "submission": {"attempt": 1, "date": "2026-08-14T23:29:05Z"},
+        "case_data": {
+            "case_id": "CLM-PACEMAKER-02",
+            "patient_age": 70,
+            "diagnoses": ["I49.5"],
+            "procedures": ["33206"],
+            "clinical_metrics": {
+                "patient_gender": "Male",
+                "claim_scenario_type": "COMPLETE",
+                "claim_payer": "CMS",
+                "claim_policy_id": "NCD-20.8.3"
+            }
+        },
+        "evidence": [
+            {
+                "evidence_key": "clinical_information",
+                "evidence_id": "clinical_info_02",
+                "source": "Clinical Information",
+                "status": "verified",
+                "confidence_score": 0.95,
+                "extracted_facts": {}
+            }
+        ]
+    }
+    
+    response = client.post("/evaluate", json=canonical_claim)
+    assert response.status_code == 200
+    res_json = response.json()
+    
+    # Verify structure
+    assert res_json["case_id"] == "CLM-PACEMAKER-02"
+    assert "outcome" in res_json
+    assert "reasoning" in res_json
+    assert isinstance(res_json["reasoning"], list)
+

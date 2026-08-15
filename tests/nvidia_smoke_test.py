@@ -40,7 +40,7 @@ def load_env():
 load_env()
 
 
-from decision_agent import (
+from decision import (
     DecisionAgent,
     CaseData,
     EvidenceItem,
@@ -50,7 +50,7 @@ from decision_agent import (
     EvidenceStatus,
     DecisionOutcome,
 )
-from decision_agent.llm_provider import NVIDIAProvider
+from decision.llm_provider import NVIDIAProvider
 
 
 def run_smoke_test():

@@ -7,21 +7,21 @@ from fastapi import FastAPI, HTTPException, Query
 from pydantic import ValidationError
 from typing import Dict, Any
 
-from src.schema.models import ClaimInput, ClaimOutput
-from src.normalization.input_normalizer import normalize_claim_input
-from src.query_builder.query_builder import QueryBuilder
-from src.retrieval.exact_matcher import ExactMatcher
-from src.embeddings.bge_embedder import BGEEmbedder
-from src.retrieval.faiss_retriever import FAISSRetriever
-from src.retrieval.bm25_retriever import BM25Retriever
-from src.retrieval.candidate_pool import CandidatePool
-from src.reranking.bge_reranker import BGEReranker
-from src.aggregation.policy_aggregator import PolicyAggregator
-from src.analyzer.deterministic_analyzer import DeterministicAnalyzer
-from src.evidence.evidence_builder import EvidenceBuilder
-from src.llm.llm_client import LLMClient
-from src.llm.prompt_builder import PromptBuilder
-from src.validation.output_validator import OutputValidator
+from models.rag_models import ClaimInput, ClaimOutput
+from rag.normalization.input_normalizer import normalize_claim_input
+from rag.query_builder.query_builder import QueryBuilder
+from rag.retrieval.exact_matcher import ExactMatcher
+from rag.embeddings.bge_embedder import BGEEmbedder
+from rag.retrieval.faiss_retriever import FAISSRetriever
+from rag.retrieval.bm25_retriever import BM25Retriever
+from rag.retrieval.candidate_pool import CandidatePool
+from rag.reranking.bge_reranker import BGEReranker
+from rag.aggregation.policy_aggregator import PolicyAggregator
+from rag.analyzer.deterministic_analyzer import DeterministicAnalyzer
+from rag.evidence.evidence_builder import EvidenceBuilder
+from rag.llm.llm_client import LLMClient
+from rag.llm.prompt_builder import PromptBuilder
+from rag.validation.output_validator import OutputValidator
 
 # Global variables to cache loaded models and indexes
 CONFIG: Dict[str, Any] = {}
@@ -153,13 +153,14 @@ def triage(claim_input: ClaimInput, debug: bool = Query(False, description="Enab
         # 5. Reranking (BGE Reranker V2 M3)
         reranked_candidates = BGE_RERANKER.rerank(queries["semantic_query"], top_candidates)
         
-        # 6. Policy Aggregator & Consistency Gate
+        # 6. Policy Aggregator & Consistency Gate (procedure-required; honor claim policy_id)
         selected_policy_id, aggregated_chunks, best_score = POLICY_AGGREGATOR.aggregate(
             reranked_candidates,
             ALL_CHUNKS,
             norm_claim.insurance.primary.payer,
             norm_claim.procedure.code,
-            norm_claim.clinical_domain
+            norm_claim.clinical_domain,
+            requested_policy_id=norm_claim.insurance.primary.policy_id or None,
         )
         
         # 7. Deterministic Analyzer
@@ -219,3 +220,40 @@ def triage(claim_input: ClaimInput, debug: bool = Query(False, description="Enab
         raise HTTPException(status_code=422, detail=f"Validation Error: {ve.errors()}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+
+@app.post("/evaluate", response_model=Dict[str, Any])
+def evaluate_claim(canonical_claim: Dict[str, Any], debug: bool = Query(False, description="Enable return of debug details in logs")):
+    """
+    POST /evaluate
+    Executes the end-to-end integration flow matching the stable Version-1 CanonicalClaim (Constraint 1-16).
+    """
+    try:
+        # Collect all initialized RAG components
+        components = {
+            "config": CONFIG,
+            "all_chunks": ALL_CHUNKS,
+            "all_chunks_dict": ALL_CHUNKS_DICT,
+            "exact_matcher": EXACT_MATCHER,
+            "bge_embedder": BGE_EMBEDDER,
+            "faiss_retriever": FAISS_RETRIEVER,
+            "bm25_retriever": BM25_RETRIEVER,
+            "candidate_pool": CANDIDATE_POOL,
+            "bge_reranker": BGE_RERANKER,
+            "policy_aggregator": POLICY_AGGREGATOR,
+            "deterministic_analyzer": DETERMINISTIC_ANALYZER,
+            "evidence_builder": EVIDENCE_BUILDER,
+            "llm_client": LLM_CLIENT,
+            "prompt_builder": PROMPT_BUILDER,
+            "output_validator": OUTPUT_VALIDATOR,
+            "query_builder": QUERY_BUILDER,
+            "llm_provider": None  # defaults to NVIDIAProvider or MockLLMProvider in DecisionAgent
+        }
+        
+        # Run integrated pipeline
+        from services.integrated_pipeline import run_integrated_pipeline
+        response = run_integrated_pipeline(canonical_claim, components)
+        return response.model_dump(mode="json")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+

@@ -14,7 +14,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from decision_agent import (
+from decision import (
     CaseData,
     DecisionAgent,
     DecisionOutcome,
@@ -25,7 +25,7 @@ from decision_agent import (
     PolicyCriterion,
     Rule,
 )
-from decision_agent.llm_provider import load_env
+from decision.llm_provider import load_env
 
 
 def benchmark_policy() -> Policy:

@@ -6,21 +6,21 @@ import numpy as np
 import subprocess
 from typing import Dict, Any, List
 
-from src.schema.models import ClaimInput
-from src.normalization.input_normalizer import normalize_claim_input
-from src.query_builder.query_builder import QueryBuilder
-from src.retrieval.exact_matcher import ExactMatcher
-from src.embeddings.bge_embedder import BGEEmbedder
-from src.retrieval.faiss_retriever import FAISSRetriever
-from src.retrieval.bm25_retriever import BM25Retriever
-from src.retrieval.candidate_pool import CandidatePool
-from src.reranking.bge_reranker import BGEReranker
-from src.aggregation.policy_aggregator import PolicyAggregator
-from src.analyzer.deterministic_analyzer import DeterministicAnalyzer
-from src.evidence.evidence_builder import EvidenceBuilder
-from src.llm.llm_client import LLMClient
-from src.llm.prompt_builder import PromptBuilder
-from src.validation.output_validator import OutputValidator
+from models.rag_models import ClaimInput
+from rag.normalization.input_normalizer import normalize_claim_input
+from rag.query_builder.query_builder import QueryBuilder
+from rag.retrieval.exact_matcher import ExactMatcher
+from rag.embeddings.bge_embedder import BGEEmbedder
+from rag.retrieval.faiss_retriever import FAISSRetriever
+from rag.retrieval.bm25_retriever import BM25Retriever
+from rag.retrieval.candidate_pool import CandidatePool
+from rag.reranking.bge_reranker import BGEReranker
+from rag.aggregation.policy_aggregator import PolicyAggregator
+from rag.analyzer.deterministic_analyzer import DeterministicAnalyzer
+from rag.evidence.evidence_builder import EvidenceBuilder
+from rag.llm.llm_client import LLMClient
+from rag.llm.prompt_builder import PromptBuilder
+from rag.validation.output_validator import OutputValidator
 
 def get_memory_usage_mb() -> float:
     """

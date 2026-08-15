@@ -1,6 +1,6 @@
 import pytest
-from src.aggregation.policy_aggregator import PolicyAggregator
-from src.validation.output_validator import OutputValidator
+from rag.aggregation.policy_aggregator import PolicyAggregator
+from rag.validation.output_validator import OutputValidator
 
 def test_cross_policy_contamination_prevention():
     agg = PolicyAggregator()

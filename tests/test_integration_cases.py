@@ -1,10 +1,10 @@
 import json
 import pytest
 from transformation.canonical_claim import build_canonical_claim
-from transformation.rag_input import build_rag_policy
-from decision_agent.agent import DecisionAgent
-from decision_agent.schemas import DecisionOutcome, CriterionAssessmentStatus
-from decision_agent.llm_provider import MockLLMProvider
+from adapters.rag_adapter import build_rag_policy
+from decision.agent import DecisionAgent
+from decision.schemas import DecisionOutcome, CriterionAssessmentStatus
+from decision.llm_provider import MockLLMProvider
 
 # Shared integration test RAG policy
 INTEGRATION_POLICY = {
@@ -531,11 +531,34 @@ def test_independence_verifications():
     """
     Ensure DecisionAgent does not import any database connection modules,
     raw Synthea files, or raw documents parser modules.
+
+    The check runs in a fresh subprocess because third-party ML libraries
+    (sentence_transformers/huggingface_hub via the RAG stack) transitively
+    import sqlite3 into the shared pytest process, which would pollute a
+    global sys.modules check without involving the decision layer at all.
     """
+    import subprocess
     import sys
-    assert "sqlite3" not in sys.modules
-    assert "psycopg2" not in sys.modules
-    # Ensure no db module from our project is loaded unless mock/utils
-    forbidden_imports = ["synthea", "database", "db_client", "raw_documents"]
-    for mod in sys.modules:
-        assert not any(forbidden in mod for forbidden in forbidden_imports), f"Forbidden import found: {mod}"
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    snippet = (
+        "import sys\n"
+        "import decision.agent\n"
+        "import decision.decision_logic\n"
+        "import decision.policy_evaluator\n"
+        "import decision.evidence_evaluator\n"
+        "bad = [m for m in ('sqlite3', 'psycopg2') if m in sys.modules]\n"
+        "forbidden = ['synthea', 'database', 'db_client', 'raw_documents']\n"
+        "bad += [m for m in sys.modules if any(f in m for f in forbidden)]\n"
+        "print('|'.join(bad))\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", snippet],
+        capture_output=True,
+        text=True,
+        cwd=str(root),
+    )
+    assert result.returncode == 0, f"Independence check crashed: {result.stderr}"
+    bad_modules = result.stdout.strip()
+    assert not bad_modules, f"Forbidden import found: {bad_modules}"

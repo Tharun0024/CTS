@@ -86,6 +86,17 @@ def _extract_runtime_metrics(runtime_claim: Mapping[str, Any]) -> Dict[str, Any]
     if isinstance(runtime_claim.get("clinical_metrics"), dict):
         metrics.update(runtime_claim["clinical_metrics"])
 
+    insurance = runtime_claim.get("insurance")
+    if isinstance(insurance, dict):
+        primary = insurance.get("primary")
+        if isinstance(primary, dict):
+            payer = primary.get("payer")
+            if payer:
+                metrics["claim_payer"] = payer
+            policy_id = primary.get("policy_id")
+            if policy_id:
+                metrics["claim_policy_id"] = policy_id
+
     return metrics
 
 

@@ -1,7 +1,7 @@
 import json
 
-from decision_agent.schemas import CanonicalClaim
-from transformation.runtime_adapter import RuntimeAdapter
+from decision.schemas import CanonicalClaim
+from adapters.runtime_adapter import RuntimeAdapter
 
 
 def test_initial_claim_retrieval():
@@ -14,6 +14,17 @@ def test_initial_claim_retrieval():
     assert payload["case_data"]["patient_age"] == 49
     assert payload["case_data"]["procedures"] == ["27447"]
     assert len(payload["evidence"]) >= 3
+    # Diagnoses must come from submitted evidence ICD codes, not full history dump
+    assert all(isinstance(d, str) for d in payload["case_data"]["diagnoses"])
+    assert all(len(d) < 16 for d in payload["case_data"]["diagnoses"])  # ICD-style, not long SNOMED dumps alone
+    # Evidence keys must be semantic when evidence_type is known
+    known_keys = {"diagnosis", "imaging", "recommendation", "conservative_treatment"}
+    assert all(
+        item["evidence_key"] in known_keys
+        or item["evidence_key"] == item["evidence_id"]
+        for item in payload["evidence"]
+    )
+    assert any(item["evidence_key"] in known_keys for item in payload["evidence"])
 
     canonical = {"case_data": payload["case_data"], "evidence": payload["evidence"]}
     CanonicalClaim.model_validate(canonical)
@@ -81,3 +92,28 @@ def test_output_compatibility_with_existing_contract():
     assert payload["case_data"]["patient_age"] is not None
     assert isinstance(payload["evidence"], list)
     assert all("evidence_id" in item for item in payload["evidence"])
+
+
+def test_linked_runtime_claim_includes_payer_without_overriding_claim_payer():
+    linked = RuntimeAdapter().get_linked_runtime_claim("PA045", "CLM-08BC25", 1)
+
+    assert linked is not None
+    metrics = linked["case_data"]["clinical_metrics"]
+    assert metrics["claim_payer"] == "Aetna"  # never overridden
+    assert metrics["member_id"] == "PA045"
+    assert metrics["member_payer_id"] == "CMS"
+    assert metrics["plan_id"] == "PLAN-CMS-001"
+    assert metrics["claim_member_payer_mismatch"] is True
+    assert linked["payer_context"]["member_id"] == "PA045"
+    assert "evidence" not in linked["payer_context"]
+
+
+def test_payer_alias_normalization_is_explicit():
+    assert RuntimeAdapter.normalize_payer_alias("Athena") == "Aetna"
+    assert RuntimeAdapter.normalize_payer_alias("Aetna") == "Aetna"
+    assert RuntimeAdapter.normalize_payer_alias("UnknownPayerX") == "UnknownPayerX"
+
+
+def test_unknown_evidence_type_remains_unresolved():
+    assert RuntimeAdapter.map_evidence_key("NOT_A_REAL_TYPE", "EV-XYZ") == "EV-XYZ"
+    assert RuntimeAdapter.map_evidence_key("DIAGNOSIS", "EV-XYZ") == "diagnosis"

@@ -2,11 +2,11 @@ import os
 import json
 import yaml
 import numpy as np
-from src.normalization.policy_normalizer import normalize_policies_dataset
-from src.chunking.policy_chunker import chunk_policies
-from src.embeddings.bge_embedder import BGEEmbedder
-from src.retrieval.faiss_retriever import FAISSRetriever
-from src.retrieval.bm25_retriever import BM25Retriever
+from rag.normalization.policy_normalizer import normalize_policies_dataset
+from rag.chunking.policy_chunker import chunk_policies
+from rag.embeddings.bge_embedder import BGEEmbedder
+from rag.retrieval.faiss_retriever import FAISSRetriever
+from rag.retrieval.bm25_retriever import BM25Retriever
 
 def main():
     # Load configuration
