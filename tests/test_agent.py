@@ -11,6 +11,7 @@ from decision_agent import (
     EvidenceStatus,
     DecisionOutcome,
     CanonicalClaim,
+    CriterionAssessmentStatus,
 )
 from decision_agent.policy_evaluator import resolve_field_value, check_operator
 from decision_agent.llm_provider import MockLLMProvider, NVIDIAProvider
@@ -1499,6 +1500,28 @@ def test_phase2_not_satisfied_rejects_only_with_canonical_support(diabetes_polic
         claim, diabetes_policy.model_dump(mode="json")
     )
     assert result.outcome == DecisionOutcome.REJECT
+
+
+def test_phase2_supported_but_below_threshold_still_rejects_deterministically(diabetes_policy):
+    """The LLM may only confirm evidence readability; the deterministic rule still decides the final outcome."""
+    claim = _canonical_claim()
+    claim["case_data"]["clinical_metrics"]["HbA1c"] = 7.2
+    claim["evidence"][0]["extracted_facts"]["hba1c"] = 7.2
+
+    def supported_but_failing(prompt, _system):
+        return json.dumps({
+            "status": "SUPPORTED",
+            "selected_paths": [1],
+            "reason": "HbA1c value is present and readable.",
+        })
+
+    provider = MockLLMProvider(response_generator=supported_but_failing)
+    result = DecisionAgent(llm_provider=provider).evaluate_canonical_claim(
+        claim, diabetes_policy.model_dump(mode="json")
+    )
+
+    assert result.outcome == DecisionOutcome.REJECT
+    assert result.criterion_assessments["CRT-HBA1C"].status == CriterionAssessmentStatus.NOT_SATISFIED
 
 
 def test_phase2_missing_mandatory_evidence_requests_more_information(diabetes_policy):
