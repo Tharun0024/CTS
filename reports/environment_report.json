@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-08-14T13:35:00",
+  "os": "Windows",
+  "python_version": "3.13.4",
+  "pip_version": "26.0.1",
+  "cpu": "AMD Ryzen 5 5500U with Radeon Graphics",
+  "total_physical_memory_bytes": 7866081280,
+  "gpu": "None / Integrated Radeon Graphics (CPU-only execution)",
+  "cuda_available": false,
+  "torch_version": "2.8.0+cpu",
+  "e_drive_total_bytes": 181806309376,
+  "e_drive_free_bytes": 150505664512,
+  "paths": {
+    "project_root": "E:/RAG",
+    "models": "E:/RAG/models",
+    "embeddings": "E:/RAG/embeddings",
+    "vector_store": "E:/RAG/vector_store",
+    "cache": "E:/RAG/cache",
+    "checkpoints": "E:/RAG/checkpoints"
+  }
+}

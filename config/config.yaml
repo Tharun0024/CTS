@@ -1,0 +1,13 @@
+embedding_model: "BAAI/bge-base-en-v1.5"
+reranker_model: "BAAI/bge-reranker-base"
+candidate_pool_size: 10
+final_policy_chunk_count: 3
+device: "cpu"
+paths:
+  models: "E:/RAG/models"
+  embeddings: "E:/RAG/embeddings"
+  vector_store: "E:/RAG/vector_store"
+  cache: "E:/RAG/cache"
+  raw_data: "E:/RAG/data/raw/ragdata.jsonl"
+  normalized_data: "E:/RAG/data/normalized/normalized_policies.json"
+  processed_chunks: "E:/RAG/data/processed/chunks.json"

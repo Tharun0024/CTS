@@ -1,0 +1,369 @@
+{
+  "timestamp": "2026-08-15 00:19:01",
+  "total_test_cases": 21,
+  "metrics": {
+    "recall_at_1": 0.9047619047619048,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "mean_reciprocal_rank": 0.9444444444444444,
+    "policy_match_accuracy": 1.0,
+    "cross_policy_contamination_rate": 0.0
+  },
+  "results": [
+    {
+      "case_id": "pacemaker_exact",
+      "expected_policy": "NCD-20.8.3",
+      "retrieved_policies": [
+        "NCD-20.8.3",
+        "NCD-20.4",
+        "LCD-L33950",
+        "NCD-220.6.17",
+        "NCD-210.3"
+      ],
+      "rank_found": 1,
+      "selected_policy": "NCD-20.8.3",
+      "aggregator_match": true,
+      "relevance_score": 0.9524921774864197,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "pacemaker_no_id",
+      "expected_policy": "NCD-20.8.3",
+      "retrieved_policies": [
+        "NCD-20.8.3",
+        "NCD-20.4",
+        "NCD-220.6.17",
+        "LCD-L36575",
+        "LCD-L36039"
+      ],
+      "rank_found": 1,
+      "selected_policy": "NCD-20.8.3",
+      "aggregator_match": true,
+      "relevance_score": 0.9628269076347351,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "pacemaker_semantic",
+      "expected_policy": "NCD-20.8.3",
+      "retrieved_policies": [
+        "NCD-20.4",
+        "NCD-20.8.3",
+        "NCD-220.6.17",
+        "LCD-L36039",
+        "NCD-220.4"
+      ],
+      "rank_found": 2,
+      "selected_policy": "NCD-20.8.3",
+      "aggregator_match": true,
+      "relevance_score": 0.5355731844902039,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "icd_exact",
+      "expected_policy": "NCD-20.4",
+      "retrieved_policies": [
+        "NCD-20.4",
+        "NCD-20.8.3",
+        "NCD-220.6.17",
+        "LCD-L33950",
+        "NCD-220.4"
+      ],
+      "rank_found": 1,
+      "selected_policy": "NCD-20.4",
+      "aggregator_match": true,
+      "relevance_score": 0.9467562437057495,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "icd_no_id",
+      "expected_policy": "NCD-20.4",
+      "retrieved_policies": [
+        "NCD-20.4",
+        "NCD-20.8.3",
+        "LCD-L33950",
+        "LCD-L36039",
+        "LCD-L36575"
+      ],
+      "rank_found": 1,
+      "selected_policy": "NCD-20.4",
+      "aggregator_match": true,
+      "relevance_score": 0.8924708366394043,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "mammogram_exact",
+      "expected_policy": "NCD-220.4",
+      "retrieved_policies": [
+        "NCD-220.4",
+        "LCD-L33950",
+        "NCD-220.6.17",
+        "NCD-210.3"
+      ],
+      "rank_found": 1,
+      "selected_policy": "NCD-220.4",
+      "aggregator_match": true,
+      "relevance_score": 0.9908252358436584,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "mammogram_no_id",
+      "expected_policy": "NCD-220.4",
+      "retrieved_policies": [
+        "NCD-220.4",
+        "LCD-L33950",
+        "NCD-220.6.17",
+        "NCD-210.3",
+        "LCD-L36039"
+      ],
+      "rank_found": 1,
+      "selected_policy": "NCD-220.4",
+      "aggregator_match": true,
+      "relevance_score": 0.9742576479911804,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "colorectal_exact",
+      "expected_policy": "NCD-210.3",
+      "retrieved_policies": [
+        "NCD-210.3",
+        "NCD-220.6.17",
+        "LCD-L33950",
+        "NCD-220.4"
+      ],
+      "rank_found": 1,
+      "selected_policy": "NCD-210.3",
+      "aggregator_match": true,
+      "relevance_score": 0.9902076125144958,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "colorectal_no_id",
+      "expected_policy": "NCD-210.3",
+      "retrieved_policies": [
+        "NCD-210.3",
+        "NCD-220.6.17",
+        "LCD-L33950",
+        "NCD-220.4",
+        "LCD-L36039"
+      ],
+      "rank_found": 1,
+      "selected_policy": "NCD-210.3",
+      "aggregator_match": true,
+      "relevance_score": 0.8942040801048279,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "pet_exact",
+      "expected_policy": "NCD-220.6.17",
+      "retrieved_policies": [
+        "NCD-220.6.17",
+        "LCD-L33950",
+        "NCD-220.4",
+        "NCD-20.8.3",
+        "NCD-210.3"
+      ],
+      "rank_found": 1,
+      "selected_policy": "NCD-220.6.17",
+      "aggregator_match": true,
+      "relevance_score": 0.9939601421356201,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "pet_no_id",
+      "expected_policy": "NCD-220.6.17",
+      "retrieved_policies": [
+        "NCD-220.6.17",
+        "LCD-L33950",
+        "NCD-220.4",
+        "NCD-210.3",
+        "LCD-L36039"
+      ],
+      "rank_found": 1,
+      "selected_policy": "NCD-220.6.17",
+      "aggregator_match": true,
+      "relevance_score": 0.9769411683082581,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "knee_exact",
+      "expected_policy": "LCD-L36575",
+      "retrieved_policies": [
+        "LCD-L36575",
+        "LCD-L36039",
+        "NCD-220.4",
+        "LCD-L33950",
+        "CPB-0660"
+      ],
+      "rank_found": 1,
+      "selected_policy": "LCD-L36575",
+      "aggregator_match": true,
+      "relevance_score": 0.990136444568634,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "knee_no_id",
+      "expected_policy": "LCD-L36575",
+      "retrieved_policies": [
+        "LCD-L36575",
+        "LCD-L36039",
+        "LCD-L33950",
+        "NCD-210.3",
+        "CPB-0660"
+      ],
+      "rank_found": 1,
+      "selected_policy": "LCD-L36575",
+      "aggregator_match": true,
+      "relevance_score": 0.7491006255149841,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "hip_exact",
+      "expected_policy": "LCD-L36039",
+      "retrieved_policies": [
+        "LCD-L36039",
+        "CPB-0287",
+        "LCD-L36575",
+        "LCD-L33950",
+        "CPB-0660"
+      ],
+      "rank_found": 1,
+      "selected_policy": "LCD-L36039",
+      "aggregator_match": true,
+      "relevance_score": 0.9680572152137756,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "hip_no_id",
+      "expected_policy": "LCD-L36039",
+      "retrieved_policies": [
+        "LCD-L36039",
+        "LCD-L36575",
+        "LCD-L33950",
+        "CPB-0287",
+        "NCD-210.3"
+      ],
+      "rank_found": 1,
+      "selected_policy": "LCD-L36039",
+      "aggregator_match": true,
+      "relevance_score": 0.8821959495544434,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "breast_imaging_exact",
+      "expected_policy": "LCD-L33950",
+      "retrieved_policies": [
+        "LCD-L33950",
+        "NCD-220.4",
+        "NCD-210.3",
+        "CPB-0105",
+        "LCD-L36575"
+      ],
+      "rank_found": 1,
+      "selected_policy": "LCD-L33950",
+      "aggregator_match": true,
+      "relevance_score": 0.9683199524879456,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "breast_imaging_no_id",
+      "expected_policy": "LCD-L33950",
+      "retrieved_policies": [
+        "LCD-L33950",
+        "NCD-220.4",
+        "NCD-220.6.17",
+        "NCD-210.3",
+        "LCD-L36039"
+      ],
+      "rank_found": 1,
+      "selected_policy": "LCD-L33950",
+      "aggregator_match": true,
+      "relevance_score": 0.8664849400520325,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "hard_neg_knee_vs_hip",
+      "expected_policy": "LCD-L36575",
+      "retrieved_policies": [
+        "LCD-L36575",
+        "LCD-L36039",
+        "CPB-0660",
+        "LCD-L33950",
+        "NCD-210.3"
+      ],
+      "rank_found": 1,
+      "selected_policy": "LCD-L36575",
+      "aggregator_match": true,
+      "relevance_score": 0.8759754300117493,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "hard_neg_hip_vs_knee",
+      "expected_policy": "LCD-L36039",
+      "retrieved_policies": [
+        "LCD-L36039",
+        "LCD-L36575",
+        "LCD-L33950",
+        "NCD-210.3",
+        "CPB-0287"
+      ],
+      "rank_found": 1,
+      "selected_policy": "LCD-L36039",
+      "aggregator_match": true,
+      "relevance_score": 0.748160719871521,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "conflict_case",
+      "expected_policy": "LCD-L36039",
+      "retrieved_policies": [
+        "NCD-20.8.3",
+        "LCD-L36575",
+        "LCD-L36039",
+        "NCD-20.4",
+        "CPB-0287"
+      ],
+      "rank_found": 3,
+      "selected_policy": "LCD-L36039",
+      "aggregator_match": true,
+      "relevance_score": 0.34763726592063904,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    },
+    {
+      "case_id": "unknown_case",
+      "expected_policy": "NO_RELIABLE_POLICY_MATCH",
+      "retrieved_policies": [
+        "NCD-210.3",
+        "NCD-20.8.3",
+        "NCD-220.6.17",
+        "NCD-20.4",
+        "LCD-L36039"
+      ],
+      "rank_found": "not found",
+      "selected_policy": "NO_RELIABLE_POLICY_MATCH",
+      "aggregator_match": true,
+      "relevance_score": 0.0,
+      "contaminated": false,
+      "contamination_rate": 0.0
+    }
+  ]
+}
