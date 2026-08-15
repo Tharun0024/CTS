@@ -1,4 +1,5 @@
 
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FilePlus2, List,
@@ -46,6 +47,22 @@ const navGroups = [
 export function HospitalSidebar({ isMobileOpen, setIsMobileOpen, isCollapsed }: HospitalSidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('orca_logged_user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
 
   const handleNav = (path: string) => {
     navigate(path);
@@ -146,10 +163,10 @@ export function HospitalSidebar({ isMobileOpen, setIsMobileOpen, isCollapsed }: 
         <div className="px-3 py-4 border-t border-white/5 flex-shrink-0">
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 border border-white/5">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-black text-xs flex-shrink-0">
-              SJ
+              {user ? getInitials(user.name) : 'SJ'}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[12px] font-bold text-white/80 truncate">Dr. S. Jenkins</p>
+              <p className="text-[12px] font-bold text-white/80 truncate">{user ? user.name : 'Dr. S. Jenkins'}</p>
               <p className="text-[10px] text-white/30 truncate">City General Hospital</p>
             </div>
           </div>

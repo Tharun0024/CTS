@@ -17,14 +17,14 @@ export function Header({ portal, title }: HeaderProps) {
     getNotifications().then(n => setUnread(n.filter(x => !x.read).length));
   }, []);
 
-  const isHospital   = portal === 'hospital';
-  const notifPath    = isHospital ? '/hospital/notifications' : '/insurance/notifications';
-  const userName     = isHospital ? 'Dr. Sarah Jenkins'     : 'Alex Rivera';
-  const userSub      = isHospital ? 'City General Hospital' : 'HealthShield Inc.';
-  const avatarGrad   = isHospital ? 'from-emerald-500 to-teal-600' : 'from-indigo-500 to-violet-600';
-  const bellHover    = isHospital ? 'hover:bg-emerald-50 hover:text-emerald-700' : 'hover:bg-indigo-50 hover:text-indigo-700';
-  const badgeBg      = isHospital ? 'bg-emerald-600' : 'bg-indigo-600';
-  const searchFocus  = isHospital
+  const isHospital = portal === 'hospital';
+  const notifPath = isHospital ? '/hospital/notifications' : '/insurance/notifications';
+  const userName = isHospital ? 'Dr. Sarah Jenkins' : 'Alex Rivera';
+  const userSub = isHospital ? 'City General Hospital' : 'HealthShield Inc.';
+  const avatarGrad = isHospital ? 'from-emerald-500 to-teal-600' : 'from-indigo-500 to-violet-600';
+  const bellHover = isHospital ? 'hover:bg-emerald-50 hover:text-emerald-700' : 'hover:bg-indigo-50 hover:text-indigo-700';
+  const badgeBg = isHospital ? 'bg-emerald-600' : 'bg-indigo-600';
+  const searchFocus = isHospital
     ? 'focus:border-emerald-400 focus:ring-emerald-100'
     : 'focus:border-indigo-400 focus:ring-indigo-100';
 
@@ -48,7 +48,7 @@ export function Header({ portal, title }: HeaderProps) {
           <Search className="w-4 h-4 text-slate-400 absolute left-3 z-10 pointer-events-none group-focus-within:text-slate-600 transition-colors" />
           <input
             type="text"
-            placeholder="Search claims, patients, policies…"
+            placeholder="Search"
             className={clsx(
               'w-80 pl-10 pr-4 py-2 bg-slate-50/80 border border-slate-200 rounded-xl text-[13px] font-medium text-slate-700 placeholder:text-slate-400 transition-all shadow-sm focus:ring-2 outline-none',
               searchFocus

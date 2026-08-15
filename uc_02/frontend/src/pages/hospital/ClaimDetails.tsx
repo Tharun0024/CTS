@@ -13,7 +13,7 @@ import { ErrorState } from '../../components/common/ErrorState';
 import { getClaimDetails } from '../../services/claimsApi';
 import { usePolling, isTerminalStatus } from '../../services/polling';
 import type { ClaimDetails } from '../../types/claim';
-import { CheckCircle2, AlertTriangle, Users, Loader2, Shield } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Users, Loader2, Shield, Clock } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -135,6 +135,167 @@ export function HospitalClaimDetails() {
           <div className="grid grid-cols-1 gap-5">
             <PatientInfoCard patient={claim.patient} portal="hospital" />
           </div>
+
+          {/* V1 Workflow Details */}
+          <Card className="animate-fade-in-up shadow-sm">
+            <CardHeader className="py-3 px-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+              <CardTitle className="text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                <Shield className="w-3.5 h-3.5 text-emerald-600" />
+                V1 Workflow Execution & Evidence
+              </CardTitle>
+              <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
+                Attempt {claim.attempt ?? 1} of 2
+              </span>
+            </CardHeader>
+            <CardContent className="p-5 space-y-6">
+              
+              {/* Grid for Evidence Request & Response */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* 1. Evidence Request */}
+                {claim.evidence_request ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[11px] font-black text-amber-900 uppercase tracking-wider">Evidence Request</h4>
+                      <span className="text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                        {claim.evidence_request.status.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <div className="space-y-1.5 text-xs">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Requested Evidence</span>
+                        <p className="font-extrabold text-slate-900 mt-0.5">{claim.evidence_request.requested_evidence}</p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Reason</span>
+                        <p className="font-medium text-slate-700 mt-0.5">{claim.evidence_request.reason}</p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Status</span>
+                        <p className="font-extrabold text-amber-700 mt-0.5">
+                          {claim.evidence_request.status === 'PENDING_PROVIDER_RESPONSE' ? 'PENDING PROVIDER RESPONSE' : claim.evidence_request.status.replace(/_/g, ' ')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 border border-slate-200 border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center">
+                    <Clock className="w-6 h-6 text-slate-350 mb-2" />
+                    <p className="text-xs font-semibold text-slate-500">No Evidence Request</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">This claim has not requested additional clinical documents.</p>
+                  </div>
+                )}
+
+                {/* 3. Evidence Response */}
+                {claim.evidence_response ? (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[11px] font-black text-emerald-900 uppercase tracking-wider">Evidence Response</h4>
+                      <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                        {claim.evidence_response.status.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <div className="space-y-1.5 text-xs">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Evidence</span>
+                        <p className="font-extrabold text-slate-900 mt-0.5">{claim.evidence_response.evidence}</p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Decision</span>
+                        <p className="font-extrabold text-emerald-700 mt-0.5">{claim.evidence_response.decision}</p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Status</span>
+                        <p className="font-extrabold text-emerald-800 mt-0.5">
+                          {claim.evidence_response.status === 'SENT_TO_PAYER' ? 'SENT TO PAYER' : claim.evidence_response.status.replace(/_/g, ' ')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 border border-slate-200 border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center">
+                    <Clock className="w-6 h-6 text-slate-350 mb-2" />
+                    <p className="text-xs font-semibold text-slate-500">No Evidence Uploaded</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Awaiting provider clinical data release.</p>
+                  </div>
+                )}
+
+              </div>
+
+              {/* 2. Agent 2 Result (If present) */}
+              {(claim.agent2_result || claim.evidence_response?.decision) && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-emerald-600 animate-pulse" />
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Decision Engine</span>
+                      <span className="text-xs font-extrabold text-slate-800">Agent 2 Evaluation Outcome</span>
+                    </div>
+                  </div>
+                  <span className={clsx(
+                    'text-xs font-black px-3 py-1 rounded-lg border shadow-sm',
+                    (claim.agent2_result ?? claim.evidence_response?.decision) === 'RELEASED'
+                      ? 'bg-emerald-100 border-emerald-200 text-emerald-700'
+                      : 'bg-amber-100 border-amber-200 text-amber-700'
+                  )}>
+                    Agent 2 {(claim.agent2_result ?? claim.evidence_response?.decision ?? '').replace(/_/g, ' ')}
+                  </span>
+                </div>
+              )}
+
+              {/* 4. Attempt / Resubmission visual timeline */}
+              <div className="border-t border-slate-100 pt-4 space-y-3">
+                <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-wider">Submissions & Attempts</h4>
+                
+                <div className="flex flex-col sm:flex-row items-stretch gap-4 justify-between">
+                  {/* Attempt 1 block */}
+                  <div className="flex-1 bg-slate-50/50 border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold text-slate-900">Attempt 1</span>
+                        <span className="text-[10px] font-bold text-slate-500">Submitted</span>
+                      </div>
+                      <div className="flex flex-col items-center py-2 text-center text-xs space-y-1 bg-white border border-slate-150 rounded-lg p-2.5">
+                        <span className="font-semibold text-slate-500">Attempt 1</span>
+                        <span className="text-slate-400 text-[10px]">↓</span>
+                        <span className="font-extrabold text-amber-600 font-mono text-[10px]">NEED_MORE_INFO</span>
+                        <span className="text-slate-400 text-[10px]">↓</span>
+                        <span className="font-semibold text-slate-700 text-[10px]">Evidence Requested</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Attempt 2 block */}
+                  {((claim.attempt ?? 1) >= 2 || claim.status === 'SUBMITTED_AGAIN' || claim.resubmission_status === 'RESUBMITTED') ? (
+                    <div className="flex-1 bg-slate-50/50 border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-bold text-slate-900">Attempt 2</span>
+                          <span className="text-[10px] font-bold text-emerald-600">Active</span>
+                        </div>
+                        <div className="flex flex-col items-center py-2 text-center text-xs space-y-1 bg-white border border-slate-150 rounded-lg p-2.5">
+                          <span className="font-semibold text-slate-500">Attempt 2</span>
+                          <span className="text-slate-400 text-[10px]">↓</span>
+                          <span className="font-semibold text-slate-700 text-[10px]">New Evidence Added</span>
+                          <span className="text-slate-400 text-[10px]">↓</span>
+                          <span className="font-extrabold text-emerald-600 font-mono text-[10px]">Submitted for Re-evaluation</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 border border-dashed border-slate-200 rounded-xl p-3 flex items-center justify-center text-center">
+                      <div>
+                        <span className="text-xs font-bold text-slate-400 block">Attempt 2</span>
+                        <span className="text-[10px] text-slate-350 mt-1 block">Awaiting resubmission path</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+
+            </CardContent>
+          </Card>
 
           {claim.policy_evidence.length > 0 && (
             <PolicyEvidencePanel evidence={claim.policy_evidence} policyName={claim.policy.policy_name} portal="hospital" />

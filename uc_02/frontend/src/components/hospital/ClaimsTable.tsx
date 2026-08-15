@@ -16,6 +16,7 @@ const TABS: { label: string; value: ClaimStatus | 'ALL' }[] = [
   { label: 'Rejected',      value: 'REJECTED' },
   { label: 'More Info',     value: 'MORE_INFO' },
   { label: 'Human Review',  value: 'HUMAN_REVIEW' },
+  { label: 'Resubmitted',   value: 'SUBMITTED_AGAIN' },
 ];
 
 const statusBadgeVariant: Record<string, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
@@ -123,6 +124,9 @@ export function ClaimsTable({ claims, portal }: ClaimsTableProps) {
                   <TableHead className="py-3 px-5">Patient ID</TableHead>
                   <TableHead className="py-3 px-5">Procedure</TableHead>
                   <TableHead className="py-3 px-5">Service Date</TableHead>
+                  <TableHead className="py-3 px-5">Attempt</TableHead>
+                  <TableHead className="py-3 px-5">Evidence Request</TableHead>
+                  <TableHead className="py-3 px-5">Resubmission</TableHead>
                   <TableHead className="py-3 px-5">Status</TableHead>
                   <TableHead className="py-3 px-5 text-right">Last Updated</TableHead>
                 </TableRow>
@@ -141,6 +145,13 @@ export function ClaimsTable({ claims, portal }: ClaimsTableProps) {
                     <TableCell className="px-5 py-3 text-slate-600 max-w-[220px] truncate text-sm">{c.procedure}</TableCell>
                     <TableCell className="px-5 py-3 text-sm text-slate-500">
                       {new Date(c.service_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </TableCell>
+                    <TableCell className="px-5 py-3 text-sm font-semibold text-slate-700">Attempt {c.attempt ?? 1}</TableCell>
+                    <TableCell className="px-5 py-3 text-[11px] font-semibold text-slate-600">
+                      {(c.evidence_request_status ?? 'CLOSED').replace(/_/g, ' ')}
+                    </TableCell>
+                    <TableCell className="px-5 py-3 text-[11px] font-semibold text-slate-600">
+                      {(c.resubmission_status ?? 'NOT_REQUIRED').replace(/_/g, ' ')}
                     </TableCell>
                     <TableCell className="px-5 py-3">
                       <Badge variant={statusBadgeVariant[c.status] || 'default'}>

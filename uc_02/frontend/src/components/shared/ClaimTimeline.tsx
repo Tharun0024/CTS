@@ -10,8 +10,11 @@ interface ClaimTimelineProps {
 const CFG: Record<string, { icon: any; ring: string; dot: string; bg: string }> = {
   SUBMITTED:   { icon: PlayCircle,   ring: 'border-slate-300',   dot: 'bg-slate-400',   bg: 'bg-slate-50' },
   PROCESSING:  { icon: Clock,        ring: 'border-violet-300',  dot: 'bg-violet-500',  bg: 'bg-violet-50' },
+  UNDER_REVIEW:{ icon: Clock,        ring: 'border-indigo-300',  dot: 'bg-indigo-500',  bg: 'bg-indigo-50' },
   MORE_INFO:   { icon: AlertTriangle,ring: 'border-amber-300',   dot: 'bg-amber-500',   bg: 'bg-amber-50' },
   ACCEPTED:    { icon: CheckCircle2, ring: 'border-emerald-300', dot: 'bg-emerald-500', bg: 'bg-emerald-50' },
+  SUBMITTED_AGAIN: { icon: PlayCircle, ring: 'border-sky-300', dot: 'bg-sky-500', bg: 'bg-sky-50' },
+  HUMAN_REVIEW: { icon: AlertTriangle, ring: 'border-blue-300', dot: 'bg-blue-500', bg: 'bg-blue-50' },
   REJECTED:    { icon: XCircle,      ring: 'border-red-300',     dot: 'bg-red-500',     bg: 'bg-red-50' },
 };
 
@@ -33,7 +36,8 @@ export function ClaimTimeline({ events, portal = 'hospital' }: ClaimTimelineProp
 
       <div className="p-5 space-y-4">
         {sorted.map((event, idx) => {
-          const cfg = CFG[event.status || 'SUBMITTED'] || CFG.SUBMITTED;
+          const key = event.status ?? event.event;
+          const cfg = CFG[key] || CFG.SUBMITTED;
           const Icon = cfg.icon;
           const isFirst = idx === 0;
           return (
@@ -47,7 +51,7 @@ export function ClaimTimeline({ events, portal = 'hospital' }: ClaimTimelineProp
               </div>
               <div className="flex-1 min-w-0 pt-1">
                 <p className={clsx('text-[13px] leading-snug', isFirst ? 'font-extrabold text-slate-900' : 'font-semibold text-slate-700')}>
-                  {(event as any).description}
+                  {event.message}
                 </p>
                 <p className="text-[10px] font-semibold text-slate-400 mt-0.5 uppercase tracking-wide">
                   {new Date(event.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}

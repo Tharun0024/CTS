@@ -20,9 +20,9 @@ const Row = ({ label, value, mono, highlight }: { label: string; value: string; 
 
 export function ClinicalInfoCard({ claim, portal = 'hospital' }: ClinicalInfoCardProps) {
   const isHospital = portal === 'hospital';
-  const accentBg   = isHospital ? 'bg-emerald-50' : 'bg-indigo-50';
+  const accentBg = isHospital ? 'bg-emerald-50' : 'bg-indigo-50';
   const accentIcon = isHospital ? 'text-emerald-600' : 'text-indigo-600';
-  const editColor  = isHospital ? 'text-emerald-600 hover:text-emerald-800' : 'text-indigo-600 hover:text-indigo-800';
+  const editColor = isHospital ? 'text-emerald-600 hover:text-emerald-800' : 'text-indigo-600 hover:text-indigo-800';
 
   return (
     <div className="glass-panel rounded-2xl overflow-hidden animate-fade-in-up stagger-1 shadow-sm">
@@ -42,12 +42,12 @@ export function ClinicalInfoCard({ claim, portal = 'hospital' }: ClinicalInfoCar
         </button>
       </div>
       <div className="px-5 py-3">
-        <Row label="Diagnosis"       value={claim.procedure || 'Acute Appendicitis'} highlight />
-        <Row label="ICD Code"        value={claim.procedure_code || 'K35.80'} mono />
-        <Row label="Treatment"       value={claim.procedure || 'Appendectomy'} />
-        <Row label="Admission Date"  value={new Date(claim.service_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} />
-        <Row label="Discharge Date"  value={new Date(claim.service_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} />
-        <Row label="Hospital"        value="Sunrise Hospital" />
+        <Row label="Diagnosis" value={claim.procedure || 'Acute Appendicitis'} highlight />
+        <Row label="ICD Code" value={claim.procedure_code || 'K35.80'} mono />
+        <Row label="Treatment" value={claim.procedure || 'Appendectomy'} />
+        <Row label="Admission Date" value={new Date(claim.service_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} />
+        <Row label="Discharge Date" value={new Date(claim.service_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} />
+        <Row label="Hospital" value="Sunrise Hospital" />
         <Row label="Treating Doctor" value="Dr. Arjun Prasad" highlight />
       </div>
     </div>

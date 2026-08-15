@@ -11,6 +11,7 @@ const FILTERS: { label: string; value: ClaimStatus | 'ALL' }[] = [
   { label: 'Under Review', value: 'UNDER_REVIEW' },
   { label: 'Pending',      value: 'PENDING_REVIEW' },
   { label: 'More Info',    value: 'MORE_INFO' },
+  { label: 'Resubmitted',  value: 'SUBMITTED_AGAIN' },
   { label: 'Human Review', value: 'HUMAN_REVIEW' },
   { label: 'Accepted',     value: 'ACCEPTED' },
   { label: 'Rejected',     value: 'REJECTED' },
@@ -61,7 +62,7 @@ export function IncomingClaimsTable({ claims }: IncomingClaimsTableProps) {
         <EmptyState title="No claims found" description="No claims match this filter." />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs min-w-[700px]">
+          <table className="w-full text-left text-xs min-w-[900px]">
             <thead className="bg-slate-50 text-slate-500 text-[11px] font-semibold uppercase tracking-wide border-b border-slate-200">
               <tr>
                 <th className="px-4 py-2.5">Priority</th>
@@ -69,6 +70,8 @@ export function IncomingClaimsTable({ claims }: IncomingClaimsTableProps) {
                 <th className="px-4 py-2.5">Hospital</th>
                 <th className="px-4 py-2.5">Procedure</th>
                 <th className="px-4 py-2.5">Service Date</th>
+                <th className="px-4 py-2.5">Attempt</th>
+                <th className="px-4 py-2.5">Resubmission</th>
                 <th className="px-4 py-2.5">Status</th>
                 <th className="px-4 py-2.5">Submitted</th>
               </tr>
@@ -94,6 +97,10 @@ export function IncomingClaimsTable({ claims }: IncomingClaimsTableProps) {
                   <td className="px-4 py-2.5 text-slate-700 max-w-[180px] truncate">{c.procedure}</td>
                   <td className="px-4 py-2.5 text-slate-500">
                     {new Date(c.service_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </td>
+                  <td className="px-4 py-2.5 font-semibold text-slate-700">Attempt {c.attempt ?? 1}</td>
+                  <td className="px-4 py-2.5 text-[11px] font-semibold text-slate-600">
+                    {(c.resubmission_status ?? 'NOT_REQUIRED').replace(/_/g, ' ')}
                   </td>
                   <td className="px-4 py-2.5"><StatusBadge status={c.status} className="scale-95 origin-left" /></td>
                   <td className="px-4 py-2.5 text-slate-400 text-[11px]">

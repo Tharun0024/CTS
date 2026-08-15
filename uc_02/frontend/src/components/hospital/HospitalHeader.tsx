@@ -26,11 +26,20 @@ function getBreadcrumb(pathname: string): string {
 export function HospitalHeader({ setIsMobileOpen, isCollapsed, setIsCollapsed }: HospitalHeaderProps) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [notifCount] = useState(3);
+  const [searchVal, setSearchVal] = useState('');
+  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
   const breadcrumb = getBreadcrumb(location.pathname);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('orca_logged_user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -41,6 +50,26 @@ export function HospitalHeader({ setIsMobileOpen, isCollapsed, setIsCollapsed }:
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
+
+  const handleSearch = () => {
+    if (!searchVal.trim()) return;
+    let cleanVal = searchVal.trim().toUpperCase();
+    if (/^\d+$/.test(cleanVal)) {
+      cleanVal = `CLM-${cleanVal.padStart(3, '0')}`;
+    } else if (/^CLM\d+$/.test(cleanVal)) {
+      cleanVal = `CLM-${cleanVal.slice(3)}`;
+    }
+    navigate(`/hospital/claims/${cleanVal}`);
+    setSearchVal('');
+  };
 
   return (
     <header
@@ -88,21 +117,21 @@ export function HospitalHeader({ setIsMobileOpen, isCollapsed, setIsCollapsed }:
           </div>
           <input
             type="text"
+            value={searchVal}
+            onChange={(e) => setSearchVal(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleSearch();
+              }
+            }}
             className="block w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-xl leading-5 bg-slate-50 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-1 focus:ring-emerald-400 focus:border-emerald-400 text-sm transition-all"
-            placeholder="Search claims, patients..."
+            placeholder="Search"
           />
         </div>
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Workspace Indicator */}
-        <div className="hidden lg:flex flex-col items-end mr-2">
-          <span className="text-[12px] font-bold text-slate-800">City General Hospital</span>
-          <div className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] uppercase tracking-wider text-emerald-600 font-bold">Live</span>
-          </div>
-        </div>
+
 
         {/* Notifications */}
         <button
@@ -124,10 +153,10 @@ export function HospitalHeader({ setIsMobileOpen, isCollapsed, setIsCollapsed }:
             className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200"
           >
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-black text-xs shadow-sm">
-              SJ
+              {user ? getInitials(user.name) : 'SJ'}
             </div>
             <div className="hidden sm:block text-left">
-              <p className="text-[12px] font-bold text-slate-700 leading-none">Dr. S. Jenkins</p>
+              <p className="text-[12px] font-bold text-slate-700 leading-none">{user ? user.name : 'Dr. S. Jenkins'}</p>
             </div>
             <ChevronDown className={`w-3.5 h-3.5 text-slate-400 hidden sm:block transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
           </button>
@@ -137,11 +166,11 @@ export function HospitalHeader({ setIsMobileOpen, isCollapsed, setIsCollapsed }:
               <div className="px-4 py-3 border-b border-slate-50 bg-gradient-to-r from-emerald-50 to-teal-50">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-black text-sm">
-                    SJ
+                    {user ? getInitials(user.name) : 'SJ'}
                   </div>
                   <div>
-                    <p className="text-[13px] font-bold text-slate-900">Sarah Jenkins</p>
-                    <p className="text-[11px] text-emerald-600 font-medium">sarah.j@citygeneral.com</p>
+                    <p className="text-[13px] font-bold text-slate-900">{user ? user.name : 'Sarah Jenkins'}</p>
+                    <p className="text-[11px] text-emerald-600 font-medium">{user ? user.email : 'sarah.j@citygeneral.com'}</p>
                   </div>
                 </div>
               </div>

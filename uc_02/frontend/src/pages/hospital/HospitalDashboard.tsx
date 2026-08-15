@@ -83,6 +83,21 @@ export function HospitalDashboard() {
     { label: 'Denied', value: rejected, sub: `${pct(rejected)}% rejection rate`, icon: XCircle, gradient: 'from-rose-600 to-red-700', path: '/hospital/claims' },
   ];
 
+  // V1 Workflow stats
+  const evidenceRequests = claims.filter(c => c.evidence_request_status === 'PENDING_PROVIDER_RESPONSE' || c.evidence_request_status === 'WAITING_FOR_PROVIDER').length;
+  const evidenceAwaitingReview = claims.filter(c => c.evidence_request_status === 'RECEIVED' || c.evidence_request_status === 'UNDER_AGENT2_REVIEW').length;
+  const releasedEvidence = claims.filter(c => c.agent2_result === 'RELEASED').length;
+  const escalatedEvidence = claims.filter(c => c.agent2_result === 'ESCALATED_TO_HUMAN').length;
+  const resubmissionsCount = claims.filter(c => c.resubmission_status === 'RESUBMITTED' || c.status === 'SUBMITTED_AGAIN').length;
+
+  const workflowStats = [
+    { label: 'Evidence Requests', value: evidenceRequests, desc: 'Awaiting provider response', icon: FileText, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: 'Awaiting Review', value: evidenceAwaitingReview, desc: 'Pending evaluation', icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Released Evidence', value: releasedEvidence, desc: 'Sent to payer', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'Escalated Evidence', value: escalatedEvidence, desc: 'Referred to human clinical', icon: AlertTriangle, color: 'text-rose-600', bg: 'bg-rose-50' },
+    { label: 'Resubmissions', value: resubmissionsCount, desc: 'Re-evaluation in progress', icon: Shield, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+  ];
+
   const statusDisplay: Record<string, string> = {
     'REJECTED': 'Rejected',
     'MORE_INFO': 'Needs Information',
@@ -182,6 +197,41 @@ export function HospitalDashboard() {
             </div>
           </button>
         ))}
+      </div>
+
+      {/* V1 Workflow & Evidence Metrics */}
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <div>
+          <h2 className="text-xs font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
+            <Shield className="w-4 h-4 text-emerald-600" />
+            Evidence & Resubmission Workflow (V1)
+          </h2>
+          <p className="text-[11px] text-slate-500 font-medium">Real-time status tracking of evidence loops and active resubmissions</p>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {workflowStats.map((stat, i) => {
+            const Icon = stat.icon;
+            return (
+              <div
+                key={i}
+                className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col justify-between hover:shadow-sm hover:border-emerald-200 transition-all group"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${stat.bg} group-hover:scale-105 transition-transform`}>
+                    <Icon className={`w-4 h-4 ${stat.color}`} />
+                  </div>
+                  <span className="text-2xl font-black text-slate-800 tracking-tight">
+                    {loading ? '...' : stat.value}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-slate-700 leading-tight">{stat.label}</p>
+                  <p className="text-[9px] font-medium text-slate-400 mt-0.5">{stat.desc}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Priority Claims */}

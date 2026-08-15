@@ -313,6 +313,153 @@ export const mockClaimDetails: ClaimDetails[] = [
   },
 ];
 
+const workflowDefaults = {
+  attempt: 1,
+  submission_history: [] as ClaimDetails['submission_history'],
+  evidence_request: null,
+  evidence_response: null,
+  evidence_request_status: 'CLOSED' as const,
+  resubmission_status: 'NOT_REQUIRED' as const,
+  agent2_result: null,
+  reevaluation_status: null,
+};
+
+const workflowByClaimId: Record<string, Partial<ClaimDetails>> = {
+  'CLM-001': {
+    attempt: 1,
+    submission_history: [
+      { attempt: 1, submitted_at: '2026-08-11T10:30:00Z', status: 'ACCEPTED', note: 'Approved on first pass.' },
+    ],
+  },
+  'CLM-002': {
+    attempt: 1,
+    resubmission_status: 'AWAITING_EVIDENCE',
+    submission_history: [
+      { attempt: 1, submitted_at: '2026-08-10T14:00:00Z', status: 'REJECTED', note: 'Denied due to insufficient documentation.' },
+    ],
+  },
+  'CLM-003': {
+    attempt: 1,
+    evidence_request_status: 'WAITING_FOR_PROVIDER',
+    resubmission_status: 'AWAITING_EVIDENCE',
+    evidence_request: {
+      request_id: 'EVR-003',
+      requested_evidence: 'PT Documentation',
+      reason: 'Required documentation is missing',
+      status: 'WAITING_FOR_PROVIDER',
+    },
+    submission_history: [
+      { attempt: 1, submitted_at: '2026-08-11T08:00:00Z', status: 'MORE_INFO', note: 'Agent 1 requested additional documentation.' },
+    ],
+    timeline: [
+      { timestamp: '2026-08-11T08:00:00Z', event: 'SUBMITTED', message: 'Claim Submitted', status: 'SUBMITTED' },
+      { timestamp: '2026-08-11T08:10:00Z', event: 'UNDER_REVIEW', message: 'Agent 1 Analysis', status: 'UNDER_REVIEW' },
+      { timestamp: '2026-08-11T10:15:00Z', event: 'MORE_INFO', message: 'Need More Info', status: 'MORE_INFO' },
+      { timestamp: '2026-08-11T10:16:00Z', event: 'MORE_INFO', message: 'Evidence Request', status: 'MORE_INFO' },
+      { timestamp: '2026-08-11T10:17:00Z', event: 'MORE_INFO', message: 'Provider Received Request', status: 'MORE_INFO' },
+    ],
+  },
+  'CLM-004': {
+    attempt: 1,
+    submission_history: [
+      { attempt: 1, submitted_at: '2026-08-09T11:00:00Z', status: 'HUMAN_REVIEW', note: 'Escalated to human review by Agent 1.' },
+    ],
+  },
+  'CLM-005': {
+    attempt: 1,
+    submission_history: [
+      { attempt: 1, submitted_at: '2026-08-12T10:00:00Z', status: 'PROCESSING', note: 'Under AI processing.' },
+    ],
+  },
+  'CLM-006': {
+    attempt: 1,
+    evidence_request_status: 'PENDING_PROVIDER_RESPONSE',
+    resubmission_status: 'AWAITING_EVIDENCE',
+    evidence_request: {
+      request_id: 'EVR-006',
+      requested_evidence: 'Psychiatric Clearance',
+      reason: 'Behavioral health clearance is required before approval.',
+      status: 'PENDING_PROVIDER_RESPONSE',
+    },
+    submission_history: [
+      { attempt: 1, submitted_at: '2026-08-11T15:00:00Z', status: 'UNDER_REVIEW', note: 'Under Agent 1 review.' },
+    ],
+  },
+  'CLM-007': {
+    attempt: 1,
+    evidence_request_status: 'RECEIVED',
+    resubmission_status: 'UNDER_RE_EVALUATION',
+    evidence_request: {
+      request_id: 'EVR-007',
+      requested_evidence: 'MRI + Orthopedic evaluation',
+      reason: 'Original submission lacked mandatory specialist evidence.',
+      status: 'RECEIVED',
+    },
+    evidence_response: {
+      evidence: 'MRI + Orthopedic evaluation',
+      decision: 'RELEASED',
+      status: 'SENT_TO_PAYER',
+      responded_at: '2026-08-12T10:58:00Z',
+    },
+    agent2_result: 'RELEASED',
+    submission_history: [
+      { attempt: 1, submitted_at: '2026-08-01T14:00:00Z', status: 'MORE_INFO', note: 'Need more clinical evidence.' },
+      { attempt: 2, submitted_at: '2026-08-05T09:00:00Z', status: 'RESUBMISSION_CHECK', note: 'Submitted for re-evaluation with new evidence.' },
+    ],
+    timeline: [
+      { timestamp: '2026-08-01T14:00:00Z', event: 'SUBMITTED', message: 'Claim Submitted', status: 'SUBMITTED' },
+      { timestamp: '2026-08-01T14:20:00Z', event: 'UNDER_REVIEW', message: 'Agent 1 Analysis', status: 'UNDER_REVIEW' },
+      { timestamp: '2026-08-02T09:30:00Z', event: 'MORE_INFO', message: 'Need More Info', status: 'MORE_INFO' },
+      { timestamp: '2026-08-02T09:40:00Z', event: 'MORE_INFO', message: 'Evidence Request', status: 'MORE_INFO' },
+      { timestamp: '2026-08-05T09:00:00Z', event: 'SUBMITTED_AGAIN', message: 'Resubmission', status: 'SUBMITTED_AGAIN' },
+      { timestamp: '2026-08-05T09:10:00Z', event: 'UNDER_REVIEW', message: 'Agent 1 Re-evaluation', status: 'UNDER_REVIEW' },
+    ],
+  },
+  'CLM-008': {
+    attempt: 2,
+    evidence_request_status: 'RECEIVED',
+    resubmission_status: 'RESUBMITTED',
+    evidence_request: {
+      request_id: 'EVR-008',
+      requested_evidence: 'PT Documentation',
+      reason: 'Required documentation is missing',
+      status: 'RECEIVED',
+    },
+    evidence_response: {
+      evidence: 'PT Documentation',
+      decision: 'RELEASED',
+      status: 'SENT_TO_PAYER',
+      responded_at: '2026-08-12T11:59:00Z',
+    },
+    agent2_result: 'RELEASED',
+    reevaluation_status: 'UNDER REVIEW',
+    submission_history: [
+      { attempt: 1, submitted_at: '2026-08-05T10:00:00Z', status: 'MORE_INFO', note: 'Need more information after initial analysis.' },
+      { attempt: 2, submitted_at: '2026-08-12T12:00:00Z', status: 'SUBMITTED_AGAIN', note: 'New evidence added and submitted for re-evaluation.' },
+    ],
+    timeline: [
+      { timestamp: '2026-08-05T10:00:00Z', event: 'SUBMITTED', message: 'Claim Submitted', status: 'SUBMITTED' },
+      { timestamp: '2026-08-05T10:05:00Z', event: 'UNDER_REVIEW', message: 'Agent 1 Analysis', status: 'UNDER_REVIEW' },
+      { timestamp: '2026-08-06T14:00:00Z', event: 'MORE_INFO', message: 'Need More Info', status: 'MORE_INFO' },
+      { timestamp: '2026-08-06T14:10:00Z', event: 'MORE_INFO', message: 'Evidence Request', status: 'MORE_INFO' },
+      { timestamp: '2026-08-06T14:15:00Z', event: 'MORE_INFO', message: 'Provider Received Request', status: 'MORE_INFO' },
+      { timestamp: '2026-08-12T11:30:00Z', event: 'UNDER_REVIEW', message: 'Agent 2', status: 'UNDER_REVIEW' },
+      { timestamp: '2026-08-12T11:40:00Z', event: 'ACCEPTED', message: 'Released', status: 'ACCEPTED' },
+      { timestamp: '2026-08-12T12:00:00Z', event: 'SUBMITTED_AGAIN', message: 'Resubmission', status: 'SUBMITTED_AGAIN' },
+      { timestamp: '2026-08-12T12:10:00Z', event: 'UNDER_REVIEW', message: 'Agent 1 Re-evaluation', status: 'UNDER_REVIEW' },
+    ],
+  },
+  'CLM-009': {
+    attempt: 1,
+    submission_history: [{ attempt: 1, submitted_at: '2026-08-12T13:00:00Z', status: 'DRAFT', note: 'Draft saved.' }],
+  },
+};
+
+for (const claim of mockClaimDetails) {
+  const specific = workflowByClaimId[claim.claim_id] ?? {};
+  Object.assign(claim, workflowDefaults, specific);
+}
+
 // Flat claim list (for tables/lists)
 export const mockClaims = mockClaimDetails.map(cd => ({
   claim_id: cd.claim_id,
@@ -323,6 +470,13 @@ export const mockClaims = mockClaimDetails.map(cd => ({
   diagnosis_codes: cd.claim.diagnosis_codes,
   service_date: cd.claim.service_date,
   status: cd.status,
+  attempt: cd.attempt,
+  submission_history: cd.submission_history,
+  evidence_request_status: cd.evidence_request_status,
+  resubmission_status: cd.resubmission_status,
+  agent2_result: cd.agent2_result,
+  evidence_request: cd.evidence_request,
+  evidence_response: cd.evidence_response,
   submitted_at: cd.submitted_at,
   updated_at: cd.updated_at,
 }));

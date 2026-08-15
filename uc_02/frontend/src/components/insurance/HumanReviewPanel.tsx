@@ -12,10 +12,10 @@ interface HumanReviewPanelProps {
 }
 
 const DECISIONS: { value: DecisionStatus; label: string; icon: React.ElementType; color: string; btnCls: string }[] = [
-  { value: 'ACCEPT',          label: 'Approve',      icon: CheckCircle2, color: 'text-green-600', btnCls: 'bg-green-600 hover:bg-green-700' },
-  { value: 'REJECT',          label: 'Reject',       icon: XCircle,      color: 'text-red-600',   btnCls: 'bg-red-600 hover:bg-red-700' },
-  { value: 'MORE_INFORMATION',label: 'Request Info', icon: AlertTriangle,color: 'text-amber-600', btnCls: 'bg-amber-600 hover:bg-amber-700' },
-  { value: 'HUMAN_REVIEW',    label: 'Escalate',     icon: Users,        color: 'text-blue-600',  btnCls: 'bg-brand-600 hover:bg-brand-700' },
+  { value: 'ACCEPT',          label: 'APPROVE',                  icon: CheckCircle2, color: 'text-green-600', btnCls: 'bg-green-600 hover:bg-green-700' },
+  { value: 'REJECT',          label: 'DENY',                     icon: XCircle,      color: 'text-red-600',   btnCls: 'bg-red-600 hover:bg-red-700' },
+  { value: 'MORE_INFORMATION',label: 'REQUEST MORE INFORMATION', icon: AlertTriangle,color: 'text-amber-600', btnCls: 'bg-amber-600 hover:bg-amber-700' },
+  { value: 'HUMAN_REVIEW',    label: 'ESCALATE',                 icon: Users,        color: 'text-blue-600',  btnCls: 'bg-brand-600 hover:bg-brand-700' },
 ];
 
 export function HumanReviewPanel({ reviewId, aiRecommendation, aiConfidence, onDecisionMade }: HumanReviewPanelProps) {
@@ -76,6 +76,15 @@ export function HumanReviewPanel({ reviewId, aiRecommendation, aiConfidence, onD
           </div>
         </div>
 
+        {/* Connector: AI Recommendation -> Human Decision */}
+        <div className="flex justify-center my-1">
+          <div className="bg-slate-50 border border-slate-200 rounded-full p-1.5 shadow-sm text-slate-400 flex items-center justify-center animate-bounce">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3.5 h-3.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+            </svg>
+          </div>
+        </div>
+
         {/* Decision buttons */}
         <div>
           <p className="text-[11px] font-bold text-slate-500 mb-1.5">Your Decision</p>
@@ -88,7 +97,7 @@ export function HumanReviewPanel({ reviewId, aiRecommendation, aiConfidence, onD
                   key={d.value}
                   onClick={() => setSelected(d.value)}
                   className={clsx(
-                    'flex items-center gap-1.5 p-2 rounded-lg border-2 text-[11px] font-semibold hover-card-trigger transition-all duration-150',
+                    'flex items-center justify-center text-center gap-1.5 p-2 rounded-lg border-2 text-[9px] font-extrabold tracking-tight hover-card-trigger transition-all duration-150',
                     isSelected
                       ? `border-current ring-2 ring-offset-1 bg-white ${d.color} translate-y-[-1px]`
                       : 'border-slate-100 text-slate-500 bg-slate-50/30 hover:border-slate-300'

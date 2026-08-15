@@ -14,8 +14,6 @@ export function ClaimHeader({ claim, portal = 'hospital' }: ClaimHeaderProps) {
   const accent     = isHospital ? '#059669' : '#4f46e5';
   const accentText = isHospital ? 'text-emerald-700' : 'text-indigo-700';
   const accentBg   = isHospital ? 'bg-emerald-50 border-emerald-100' : 'bg-indigo-50 border-indigo-100';
-  const statusForHeader = claim.status === 'ACCEPTED' ? 'ACCEPTED' : 'REJECTED';
-
   return (
     <div className="glass-panel rounded-2xl mb-5 overflow-hidden animate-fade-in-up shadow-sm">
       {/* Gradient top band */}
@@ -35,7 +33,7 @@ export function ClaimHeader({ claim, portal = 'hospital' }: ClaimHeaderProps) {
             </div>
             <div>
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Status</p>
-              <StatusBadge status={statusForHeader} />
+              <StatusBadge status={claim.status} />
             </div>
           </div>
         </div>

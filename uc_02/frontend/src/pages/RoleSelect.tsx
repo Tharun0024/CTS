@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Building2, ShieldCheck, ArrowRight, 
-  Activity, ArrowUpRight, 
+import {
+  Building2, ShieldCheck, ArrowRight,
+  Activity, ArrowUpRight,
   Hexagon, Triangle, Command, Ghost, HeartPulse, Zap, CheckSquare,
   Check, Terminal, FileText, BrainCircuit, CheckCircle2, FileCheck,
   Workflow, ShieldAlert, ChevronDown, Sparkles
@@ -47,7 +47,7 @@ const Fade = ({ children, delay = 0, className = '' }: { children: React.ReactNo
 const AnimatedCounter = ({ end, suffix = '', duration = 2000 }: { end: number, suffix?: string, duration?: number }) => {
   const { ref, visible } = useFadeIn();
   const [count, setCount] = useState(0);
-  
+
   useEffect(() => {
     if (!visible) return;
     let startTimestamp: number;
@@ -138,6 +138,9 @@ export function RoleSelect() {
   const [selectedTarget, setSelectedTarget] = useState<'hospital' | 'insurance' | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 30);
@@ -150,15 +153,57 @@ export function RoleSelect() {
     setAuthStep('credentials');
     setAuthMode('signin');
     setSelectedTarget(target || null);
+    setErrorMsg('');
   };
 
   const handleContinue = () => {
-    if (email && password) {
-      if (selectedTarget) {
-        selectPortal(selectedTarget);
-      } else {
-        setAuthStep('portal');
+    setErrorMsg('');
+    const defaultUsers = [
+      { name: 'Dr. S. Jenkins', email: 'user@example.com' },
+      { name: 'Alex Reynolds', email: 'alex.r@aetna.com' }
+    ];
+    let registeredUsers = JSON.parse(localStorage.getItem('orca_registered_users') || '[]');
+    if (registeredUsers.length === 0) {
+      registeredUsers = defaultUsers;
+      localStorage.setItem('orca_registered_users', JSON.stringify(registeredUsers));
+    }
+
+    if (authMode === 'signup') {
+      if (!username.trim()) {
+        setErrorMsg('Username is required');
+        return;
       }
+      if (password !== confirmPassword) {
+        setErrorMsg('Passwords do not match');
+        return;
+      }
+      const existingIdx = registeredUsers.findIndex((u: any) => u.email.toLowerCase() === email.toLowerCase());
+      const newUser = { name: username.trim(), email: email.trim().toLowerCase() };
+      if (existingIdx !== -1) {
+        registeredUsers[existingIdx] = newUser;
+      } else {
+        registeredUsers.push(newUser);
+      }
+      localStorage.setItem('orca_registered_users', JSON.stringify(registeredUsers));
+      localStorage.setItem('orca_logged_user', JSON.stringify(newUser));
+    } else {
+      const matchedUser = registeredUsers.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+      if (matchedUser) {
+        localStorage.setItem('orca_logged_user', JSON.stringify(matchedUser));
+      } else {
+        const namePart = email.split('@')[0];
+        const formattedName = namePart.split(/[\._-]/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        const newUser = { name: formattedName || 'Guest User', email: email.trim().toLowerCase() };
+        registeredUsers.push(newUser);
+        localStorage.setItem('orca_registered_users', JSON.stringify(registeredUsers));
+        localStorage.setItem('orca_logged_user', JSON.stringify(newUser));
+      }
+    }
+
+    if (selectedTarget) {
+      selectPortal(selectedTarget);
+    } else {
+      setAuthStep('portal');
     }
   };
 
@@ -334,7 +379,7 @@ export function RoleSelect() {
         transition: 'all 0.4s ease',
       }}>
         <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px', height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
             <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: 'linear-gradient(135deg, #3b82f6, #10b981)', padding: '1.5px', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}>
               <div style={{ width: '100%', height: '100%', borderRadius: '10px', background: '#030712', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -355,11 +400,11 @@ export function RoleSelect() {
           </nav>
 
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <button className="nav-link" onClick={openAuth} style={{ display: window.innerWidth < 640 ? 'none' : undefined }}>
+            <button className="nav-link" onClick={() => openAuth()} style={{ display: window.innerWidth < 640 ? 'none' : undefined }}>
               Sign In
             </button>
             <button
-              onClick={openAuth}
+              onClick={() => openAuth()}
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
                 padding: '10px 20px', borderRadius: '12px',
@@ -622,13 +667,13 @@ export function RoleSelect() {
                   <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', color: '#f472b6', textTransform: 'uppercase' }}>Proprietary AI Engine</span>
                 </div>
                 <h2 style={{ fontSize: 'clamp(32px, 4vw, 48px)', fontWeight: 800, letterSpacing: '-0.03em', marginBottom: '24px', color: '#f8fafc', lineHeight: 1.1 }}>
-                  Instant Evidence<br/>Verification
+                  Instant Evidence<br />Verification
                 </h2>
                 <p style={{ fontSize: '16px', color: '#64748b', lineHeight: 1.75, marginBottom: '32px' }}>
-                  Our specialized LLM architecture ingests unstructured clinical notes, lab results, and imaging reports to automatically extract key medical entities. 
+                  Our specialized LLM architecture ingests unstructured clinical notes, lab results, and imaging reports to automatically extract key medical entities.
                   It then cross-references this data against thousands of active insurer policies in milliseconds.
                 </p>
-                
+
                 <ul style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {[
                     { title: 'Automated OCR', desc: 'Extract text from PDFs and scanned images instantly.' },
@@ -652,9 +697,9 @@ export function RoleSelect() {
             {/* Simulated Terminal UI */}
             <div style={{ flex: 1, width: '100%' }}>
               <Fade delay={200}>
-                <div style={{ 
-                  borderRadius: '16px', border: '1px solid #1e293b', background: '#0f172a', 
-                  boxShadow: '0 24px 64px rgba(0,0,0,0.4)', overflow: 'hidden' 
+                <div style={{
+                  borderRadius: '16px', border: '1px solid #1e293b', background: '#0f172a',
+                  boxShadow: '0 24px 64px rgba(0,0,0,0.4)', overflow: 'hidden'
                 }}>
                   {/* Terminal Header */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: '#020617', borderBottom: '1px solid #1e293b' }}>
@@ -670,19 +715,19 @@ export function RoleSelect() {
                     <div style={{ color: '#3b82f6' }}>$ <span style={{ color: '#e2e8f0' }}>orca-engine extract --file patient_notes.pdf</span></div>
                     <div style={{ color: '#64748b', marginTop: '8px' }}>[INFO] Initializing OCR model v4.2...</div>
                     <div style={{ color: '#64748b' }}>[INFO] Document parsed in 142ms. 3 entities found.</div>
-                    <br/>
+                    <br />
                     <div><span style={{ color: '#c084fc' }}>const</span> evidence = {'{'}</div>
                     <div style={{ paddingLeft: '16px' }}>
-                      <span style={{ color: '#f472b6' }}>"diagnosis"</span>: <span style={{ color: '#34d399' }}>"M54.5"</span>, <span style={{ color: '#64748b' }}>// Low back pain</span><br/>
-                      <span style={{ color: '#f472b6' }}>"duration_weeks"</span>: <span style={{ color: '#fbbf24' }}>12</span>,<br/>
-                      <span style={{ color: '#f472b6' }}>"prior_treatments"</span>: [<span style={{ color: '#34d399' }}>"physical_therapy"</span>, <span style={{ color: '#34d399' }}>"NSAIDs"</span>]<br/>
+                      <span style={{ color: '#f472b6' }}>"diagnosis"</span>: <span style={{ color: '#34d399' }}>"M54.5"</span>, <span style={{ color: '#64748b' }}>// Low back pain</span><br />
+                      <span style={{ color: '#f472b6' }}>"duration_weeks"</span>: <span style={{ color: '#fbbf24' }}>12</span>,<br />
+                      <span style={{ color: '#f472b6' }}>"prior_treatments"</span>: [<span style={{ color: '#34d399' }}>"physical_therapy"</span>, <span style={{ color: '#34d399' }}>"NSAIDs"</span>]<br />
                     </div>
                     <div>{'}'}</div>
-                    <br/>
+                    <br />
                     <div style={{ color: '#3b82f6' }}>$ <span style={{ color: '#e2e8f0' }}>orca-engine evaluate --policy UHC_SPINE_01</span></div>
                     <div style={{ color: '#10b981', marginTop: '8px' }}>✔ Criteria matched: duration &gt; 6 weeks</div>
                     <div style={{ color: '#10b981' }}>✔ Criteria matched: failed conservative therapy</div>
-                    <br/>
+                    <br />
                     <div><span style={{ color: '#60a5fa', fontWeight: 600 }}>[SUCCESS]</span> Authorization Recommended (Confidence: 99.4%)<span className="terminal-cursor"></span></div>
                   </div>
                 </div>
@@ -726,8 +771,8 @@ export function RoleSelect() {
                     position: 'relative', overflow: 'hidden',
                     transition: 'border-color 0.3s, transform 0.3s',
                   }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = `${step.color}40`; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = `${step.color}40`; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
                   >
                     <div style={{ fontSize: '48px', fontWeight: 900, color: `${step.color}30`, fontFamily: 'monospace', letterSpacing: '-0.04em', lineHeight: 1, marginBottom: '20px' }}>{step.n}</div>
                     <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: `${step.color}15`, border: `1px solid ${step.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
@@ -777,8 +822,8 @@ export function RoleSelect() {
                     backdropFilter: 'blur(12px)',
                     transition: 'border-color 0.3s, transform 0.3s',
                   }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = `${cap.color}35`; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = `${cap.color}35`; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
                   >
                     <div style={{ width: '44px', height: '44px', borderRadius: '13px', background: `${cap.color}12`, border: `1px solid ${cap.color}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px', boxShadow: `0 0 16px ${cap.color}15` }}>
                       <Icon size={21} color={cap.color} className={i % 2 === 0 ? "float-icon" : "float-icon-delayed"} />
@@ -810,7 +855,7 @@ export function RoleSelect() {
             {FAQS.map((faq, i) => (
               <Fade key={i} delay={i * 50}>
                 <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', overflow: 'hidden', background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(12px)' }}>
-                  <button 
+                  <button
                     className="faq-button"
                     onClick={() => setOpenFaq(openFaq === i ? null : i)}
                     style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px', background: 'none', border: 'none', cursor: 'pointer', color: '#f1f5f9', textAlign: 'left' }}
@@ -818,9 +863,9 @@ export function RoleSelect() {
                     <span style={{ fontSize: '16px', fontWeight: 600 }}>{faq.q}</span>
                     <ChevronDown size={20} style={{ color: '#64748b', transform: openFaq === i ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s' }} />
                   </button>
-                  <div style={{ 
-                    maxHeight: openFaq === i ? '200px' : '0px', opacity: openFaq === i ? 1 : 0, 
-                    transition: 'all 0.3s ease', overflow: 'hidden' 
+                  <div style={{
+                    maxHeight: openFaq === i ? '200px' : '0px', opacity: openFaq === i ? 1 : 0,
+                    transition: 'all 0.3s ease', overflow: 'hidden'
                   }}>
                     <p style={{ padding: '0 24px 24px', color: '#94a3b8', fontSize: '15px', lineHeight: 1.7 }}>
                       {faq.a}
@@ -887,7 +932,7 @@ export function RoleSelect() {
       {/* ─── EXPANDED FOOTER (NEW) ─── */}
       <footer style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '80px 24px 40px', background: '#020617', position: 'relative', zIndex: 10 }}>
         <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
-          
+
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '64px', justifyContent: 'space-between', marginBottom: '80px' }}>
             <div style={{ maxWidth: '320px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
@@ -957,17 +1002,17 @@ export function RoleSelect() {
       {showSignIn && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}>
           <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '24px', padding: '32px', width: '100%', maxWidth: '440px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', animation: 'fade-in-up 0.3s ease-out' }}>
-            
+
             {authStep === 'credentials' && (
               <>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', background: '#1e293b', padding: '4px', borderRadius: '12px' }}>
-                  <button 
+                  <button
                     onClick={() => setAuthMode('signin')}
                     style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: authMode === 'signin' ? '#334155' : 'transparent', color: authMode === 'signin' ? '#fff' : '#94a3b8', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
                   >
                     Sign In
                   </button>
-                  <button 
+                  <button
                     onClick={() => setAuthMode('signup')}
                     style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: authMode === 'signup' ? '#334155' : 'transparent', color: authMode === 'signup' ? '#fff' : '#94a3b8', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
                   >
@@ -983,43 +1028,72 @@ export function RoleSelect() {
                 </p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {authMode === 'signup' && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Username</label>
+                      <input
+                        type="text"
+                        value={username}
+                        onChange={e => setUsername(e.target.value)}
+                        style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '12px 16px', color: '#f8fafc', outline: 'none' }}
+                        placeholder="Dr. John Doe"
+                      />
+                    </div>
+                  )}
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Email Address</label>
-                    <input 
-                      type="email" 
-                      value={email} 
-                      onChange={e => setEmail(e.target.value)} 
-                      style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '12px 16px', color: '#f8fafc', outline: 'none' }} 
-                      placeholder="user@example.com" 
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '12px 16px', color: '#f8fafc', outline: 'none' }}
+                      placeholder="user@example.com"
                     />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Password</label>
-                    <input 
-                      type="password" 
-                      value={password} 
-                      onChange={e => setPassword(e.target.value)} 
-                      style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '12px 16px', color: '#f8fafc', outline: 'none' }} 
-                      placeholder="••••••••" 
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '12px 16px', color: '#f8fafc', outline: 'none' }}
+                      placeholder="••••••••"
                     />
                   </div>
+                  {authMode === 'signup' && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Confirm Password</label>
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
+                        style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '12px 16px', color: '#f8fafc', outline: 'none' }}
+                        placeholder="••••••••"
+                      />
+                    </div>
+                  )}
+                  {errorMsg && (
+                    <div style={{ color: '#f87171', fontSize: '13px', marginTop: '4px', fontWeight: 500 }}>
+                      {errorMsg}
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ display: 'flex', gap: '12px', marginTop: '32px' }}>
-                  <button 
-                    onClick={() => setShowSignIn(false)} 
+                  <button
+                    onClick={() => setShowSignIn(false)}
                     style={{ flex: 1, padding: '12px 16px', borderRadius: '12px', background: '#1e293b', color: '#f8fafc', fontWeight: 600, border: 'none', cursor: 'pointer' }}
                   >
                     Cancel
                   </button>
-                  <button 
-                    onClick={handleContinue} 
-                    disabled={!email || !password}
-                    style={{ 
-                      flex: 1, padding: '12px 16px', borderRadius: '12px', 
-                      background: (!email || !password) ? '#334155' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)', 
-                      color: (!email || !password) ? '#94a3b8' : '#fff', 
-                      fontWeight: 600, border: 'none', cursor: (!email || !password) ? 'not-allowed' : 'pointer'
+                  <button
+                    onClick={handleContinue}
+                    disabled={authMode === 'signin' ? (!email || !password) : (!username || !email || !password || !confirmPassword)}
+                    style={{
+                      flex: 1, padding: '12px 16px', borderRadius: '12px',
+                      background: (authMode === 'signin' ? (!email || !password) : (!username || !email || !password || !confirmPassword)) ? '#334155' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                      color: (authMode === 'signin' ? (!email || !password) : (!username || !email || !password || !confirmPassword)) ? '#94a3b8' : '#fff',
+                      fontWeight: 600, border: 'none', cursor: (authMode === 'signin' ? (!email || !password) : (!username || !email || !password || !confirmPassword)) ? 'not-allowed' : 'pointer'
                     }}
                   >
                     Continue
@@ -1032,13 +1106,13 @@ export function RoleSelect() {
               <>
                 <h3 style={{ fontSize: '24px', fontWeight: 800, color: '#f8fafc', marginBottom: '8px' }}>Select Workspace</h3>
                 <p style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '24px' }}>Which portal do you want to move to?</p>
-                
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
-                  <button 
+                  <button
                     onClick={() => selectPortal('hospital')}
-                    style={{ 
-                      padding: '20px', borderRadius: '16px', border: '1px solid #334155', 
-                      background: '#1e293b', 
+                    style={{
+                      padding: '20px', borderRadius: '16px', border: '1px solid #334155',
+                      background: '#1e293b',
                       display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', transition: 'all 0.2s',
                     }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = '#10b981'; e.currentTarget.style.background = 'rgba(16,185,129,0.1)'; }}
@@ -1052,11 +1126,11 @@ export function RoleSelect() {
                       <span style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>Submit claims and track authorizations</span>
                     </div>
                   </button>
-                  <button 
+                  <button
                     onClick={() => selectPortal('insurance')}
-                    style={{ 
-                      padding: '20px', borderRadius: '16px', border: '1px solid #334155', 
-                      background: '#1e293b', 
+                    style={{
+                      padding: '20px', borderRadius: '16px', border: '1px solid #334155',
+                      background: '#1e293b',
                       display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', transition: 'all 0.2s',
                     }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; }}
@@ -1073,8 +1147,8 @@ export function RoleSelect() {
                 </div>
 
                 <div style={{ marginTop: '32px' }}>
-                  <button 
-                    onClick={() => setAuthStep('credentials')} 
+                  <button
+                    onClick={() => setAuthStep('credentials')}
                     style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', background: 'transparent', color: '#94a3b8', fontWeight: 600, border: '1px solid #334155', cursor: 'pointer' }}
                   >
                     Back

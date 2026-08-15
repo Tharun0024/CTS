@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, List,
@@ -37,6 +38,22 @@ const navGroups = [
 export function InsuranceSidebar({ isMobileOpen, setIsMobileOpen, isCollapsed }: InsuranceSidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('orca_logged_user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
 
   const handleNav = (path: string) => {
     navigate(path);
@@ -136,10 +153,10 @@ export function InsuranceSidebar({ isMobileOpen, setIsMobileOpen, isCollapsed }:
         <div className="px-3 py-4 border-t border-indigo-500/20 flex-shrink-0">
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 border border-white/5">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-black text-xs flex-shrink-0">
-              AR
+              {user ? getInitials(user.name) : 'AR'}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[12px] font-bold text-white/90 truncate">Alex Reynolds</p>
+              <p className="text-[12px] font-bold text-white/90 truncate">{user ? user.name : 'Alex Reynolds'}</p>
               <p className="text-[10px] text-indigo-300/60 truncate">Aetna Insurance</p>
             </div>
           </div>

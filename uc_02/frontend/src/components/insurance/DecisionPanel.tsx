@@ -6,6 +6,8 @@ import { clsx } from 'clsx';
 
 interface DecisionPanelProps {
   claimId: string;
+  recommendation?: string | null;
+  reason?: string | null;
   onDecisionMade?: (decision: DecisionStatus) => void;
 }
 
@@ -24,7 +26,7 @@ const REASON_CODES: Record<string, string[]> = {
   HUMAN_REVIEW:    ['CLINICAL_COMPLEXITY', 'CONFLICTING_EVIDENCE', 'HIGH_COST_PROCEDURE', 'APPEALS_PROCESS'],
 };
 
-export function DecisionPanel({ claimId, onDecisionMade }: DecisionPanelProps) {
+export function DecisionPanel({ claimId, recommendation, reason, onDecisionMade }: DecisionPanelProps) {
   const [step, setStep]         = useState<Step>('choose');
   const [selected, setSelected] = useState<DecisionStatus | null>(null);
   const [reasonCode, setReasonCode] = useState('');
@@ -90,6 +92,22 @@ export function DecisionPanel({ claimId, onDecisionMade }: DecisionPanelProps) {
         <Users className="w-3.5 h-3.5 text-brand-600" />
         <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Decision Panel</h3>
       </div>
+
+      {recommendation && (
+        <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-100 flex flex-col gap-1 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-indigo-700 font-extrabold">Agent 1 Recommendation</span>
+            <span className="font-extrabold text-indigo-900 bg-indigo-200/50 border border-indigo-200 px-2 py-0.5 rounded text-[10px]">
+              {recommendation === 'MORE_INFORMATION' ? 'NEED_MORE_INFO' : recommendation === 'ACCEPT' ? 'APPROVE' : recommendation === 'REJECT' ? 'DENY' : recommendation}
+            </span>
+          </div>
+          {reason && (
+            <p className="text-[10px] text-slate-500 italic mt-0.5 leading-normal">
+              Reason: {reason}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="p-3.5 space-y-3.5">
         {/* Step 1: Choose 2x2 Grid */}

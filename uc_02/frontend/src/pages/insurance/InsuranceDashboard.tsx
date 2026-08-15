@@ -6,7 +6,7 @@ import { ErrorState } from '../../components/common/ErrorState';
 import { getInsuranceClaims } from '../../services/insuranceApi';
 import { getReviews } from '../../services/reviewApi';
 import type { InsuranceClaim, ReviewItem } from '../../types/claim';
-import { ClipboardList, Users, CheckCircle2, Clock, ArrowRight, AlertTriangle } from 'lucide-react';
+import { ClipboardList, Users, CheckCircle2, Clock, ArrowRight, AlertTriangle, Shield, XCircle } from 'lucide-react';
 
 export function InsuranceDashboard() {
   const navigate = useNavigate();
@@ -29,12 +29,13 @@ export function InsuranceDashboard() {
   const pendingReviews = reviews.filter(r => r.status !== 'COMPLETED').length;
 
   const stats = [
-    { label: 'Incoming',      value: claims.length, icon: ClipboardList, color: 'text-brand-600', bg: 'bg-brand-50', path: '/insurance/claims' },
-    { label: 'Under Review',  value: count('UNDER_REVIEW') + count('PROCESSING'), icon: Clock, color: 'text-slate-600', bg: 'bg-slate-100', path: '/insurance/claims' },
-    { label: 'Human Review',  value: pendingReviews, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', path: '/insurance/review' },
-    { label: 'Accepted',      value: count('ACCEPTED'), icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50', path: '/insurance/claims' },
-    { label: 'Rejected',      value: count('REJECTED'), icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', path: '/insurance/claims' },
-    { label: 'More Info',     value: count('MORE_INFO'), icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50', path: '/insurance/claims' },
+    { label: 'Incoming Claims', value: count('SUBMITTED') + count('PROCESSING'), icon: ClipboardList, color: 'text-brand-600', bg: 'bg-brand-50', path: '/insurance/claims' },
+    { label: 'Under Review',    value: count('UNDER_REVIEW'), icon: Clock, color: 'text-slate-600', bg: 'bg-slate-100', path: '/insurance/claims' },
+    { label: 'Need More Info',  value: count('MORE_INFO'), icon: AlertTriangle, color: 'text-amber-605', bg: 'bg-amber-50', path: '/insurance/claims' },
+    { label: 'Resubmissions',   value: count('SUBMITTED_AGAIN'), icon: Shield, color: 'text-indigo-600', bg: 'bg-indigo-50', path: '/insurance/claims' },
+    { label: 'Approved',        value: count('ACCEPTED'), icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50', path: '/insurance/claims' },
+    { label: 'Denied',          value: count('REJECTED'), icon: XCircle, color: 'text-red-650', bg: 'bg-red-50', path: '/insurance/claims' },
+    { label: 'Human Review',    value: pendingReviews, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', path: '/insurance/review' },
   ];
 
   const recent = [...claims].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 5);
@@ -60,7 +61,7 @@ export function InsuranceDashboard() {
            (
             <div className="space-y-6">
               {/* Stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
                 {stats.map((s, i) => {
                   const Icon = s.icon;
                   return (

@@ -14,6 +14,30 @@ export type ClaimStatus =
 
 // Decision outcome (from insurance/system)
 export type DecisionStatus = 'ACCEPT' | 'REJECT' | 'MORE_INFORMATION' | 'HUMAN_REVIEW';
+export type Agent2ResultStatus = 'RELEASED' | 'ESCALATED_TO_HUMAN';
+export type EvidenceRequestStatus = 'PENDING_PROVIDER_RESPONSE' | 'WAITING_FOR_PROVIDER' | 'RECEIVED' | 'UNDER_AGENT2_REVIEW' | 'CLOSED';
+export type ResubmissionStatus = 'NOT_REQUIRED' | 'AWAITING_EVIDENCE' | 'RESUBMITTED' | 'UNDER_RE_EVALUATION';
+
+export interface SubmissionAttempt {
+  attempt: number;
+  submitted_at: string;
+  status: ClaimStatus;
+  note: string;
+}
+
+export interface EvidenceRequestSummary {
+  request_id: string;
+  requested_evidence: string;
+  reason: string;
+  status: EvidenceRequestStatus;
+}
+
+export interface EvidenceResponseSummary {
+  evidence: string;
+  decision: Agent2ResultStatus | 'RELEASED';
+  status: 'SENT_TO_PAYER' | 'RECEIVED' | 'ESCALATED';
+  responded_at?: string;
+}
 
 export interface Claim {
   claim_id: string;
@@ -25,6 +49,13 @@ export interface Claim {
   service_date: string;
   provider_id?: string;
   status: ClaimStatus;
+  attempt?: number;
+  submission_history?: SubmissionAttempt[];
+  evidence_request_status?: EvidenceRequestStatus;
+  resubmission_status?: ResubmissionStatus;
+  agent2_result?: Agent2ResultStatus | null;
+  evidence_request?: EvidenceRequestSummary | null;
+  evidence_response?: EvidenceResponseSummary | null;
   submitted_at: string;
   updated_at: string;
 }
@@ -76,6 +107,14 @@ export interface ClaimDetails {
   hospital?: string;
   documents?: DocumentRef[];
   timeline?: TimelineEvent[];
+  attempt?: number;
+  submission_history?: SubmissionAttempt[];
+  evidence_request?: EvidenceRequestSummary | null;
+  evidence_response?: EvidenceResponseSummary | null;
+  evidence_request_status?: EvidenceRequestStatus;
+  resubmission_status?: ResubmissionStatus;
+  agent2_result?: Agent2ResultStatus | null;
+  reevaluation_status?: string | null;
 }
 
 export interface DocumentRef {
@@ -102,6 +141,14 @@ export interface InsuranceClaim {
   diagnosis_codes: string[];
   service_date: string;
   status: ClaimStatus;
+  attempt?: number;
+  submission_history?: SubmissionAttempt[];
+  current_status?: string;
+  resubmission_status?: ResubmissionStatus;
+  evidence_request_status?: EvidenceRequestStatus;
+  agent2_result?: Agent2ResultStatus | null;
+  evidence_request?: EvidenceRequestSummary | null;
+  evidence_response?: EvidenceResponseSummary | null;
   submitted_at: string;
   updated_at: string;
   priority?: 'HIGH' | 'MEDIUM' | 'LOW';

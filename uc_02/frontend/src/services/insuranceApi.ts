@@ -22,18 +22,34 @@ export async function submitDecision(
   claimId: string,
   payload: DecisionPayload
 ): Promise<{ success: boolean; claim_id: string; decision: string }> {
+  const statusMap: Record<string, InsuranceClaim['status']> = {
+    ACCEPT: 'ACCEPTED',
+    REJECT: 'REJECTED',
+    MORE_INFORMATION: 'MORE_INFO',
+    HUMAN_REVIEW: 'HUMAN_REVIEW',
+  };
+
   // Update in-memory store
   const idx = insuranceStore.findIndex(c => c.claim_id === claimId);
   if (idx !== -1) {
-    const statusMap: Record<string, InsuranceClaim['status']> = {
-      ACCEPT: 'ACCEPTED',
-      REJECT: 'REJECTED',
-      MORE_INFORMATION: 'MORE_INFO',
-      HUMAN_REVIEW: 'HUMAN_REVIEW',
-    };
     insuranceStore[idx] = {
       ...insuranceStore[idx],
       status: statusMap[payload.decision] ?? insuranceStore[idx].status,
+      current_status: payload.decision.replace(/_/g, ' '),
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  const detailIdx = mockClaimDetails.findIndex(c => c.claim_id === claimId);
+  if (detailIdx !== -1) {
+    mockClaimDetails[detailIdx] = {
+      ...mockClaimDetails[detailIdx],
+      status: statusMap[payload.decision] ?? mockClaimDetails[detailIdx].status,
+      decision: {
+        status: payload.decision,
+        reason: payload.comments || payload.reason_code.replace(/_/g, ' '),
+        reason_code: payload.reason_code,
+      },
       updated_at: new Date().toISOString(),
     };
   }
