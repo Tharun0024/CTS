@@ -1,0 +1,13 @@
+patient_id,member_id,payer_id,event_type,event_date,cpt_code,details
+PA001,PA001,Aetna,Imaging,2026-06-01T10:00:00,27447,X-ray Knee: Kellgren-Lawrence Grade 4 severe OA
+PA001,PA001,Aetna,Treatment history,2026-05-15T14:30:00,27447,PT Notes: 8 weeks completed physical therapy
+PA002,PA002,Aetna,Imaging,2026-06-01T10:00:00,27447,X-ray: Kellgren-Lawrence Grade 3 OA
+PA002,PA002,Aetna,Treatment history,2026-06-20T11:00:00,27447,PT Notes: 1 week completed physical therapy (discontinued)
+PA003,PA003,CMS,Imaging,2026-06-10T09:00:00,72148,Lumbar X-ray report completed; progressive neurological deficit noted
+PA003,PA003,CMS,Treatment history,2026-05-01T10:00:00,72148,6 weeks physical therapy notes
+PA004,PA004,Aetna,Imaging Report Doc A,2026-06-01T10:00:00,27447,Radiology Report A: Severe Kellgren-Lawrence Grade 4 Osteoarthritis
+PA004,PA004,Aetna,Imaging Report Doc B,2026-06-05T14:00:00,27447,"Radiology Report B: Mild joint space loss, Grade 1 No OA"
+PA005,MEM_MISMATCH_PA005,UNKNOWN_PAYER_INC,Clinical Document,2026-06-01T10:00:00,27447,General consultation record
+PA006,PA006,Aetna,Consultation,2026-06-01T10:00:00,"27447,27487",Surgical plan detailing multi-procedure intervention
+PA007,PA007,Aetna,Clinical Document,2026-06-01T10:00:00,99999,Note for rare experimental procedure
+PA008,PA008,Aetna,Consultation,2026-06-01T10:00:00,0001T,Specialized pediatric procedure request

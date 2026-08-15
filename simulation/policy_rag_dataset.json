@@ -1,0 +1,45 @@
+{
+  "AETNA_POL_KNEE_01": {
+    "policy_id": "AETNA_POL_KNEE_01",
+    "payer_id": "Aetna",
+    "plan_id": "AETNA_GOLD_PPO",
+    "cpt_code": "27447",
+    "title": "Total Knee Arthroplasty (TKA) Medical Policy",
+    "min_kl_grade": 3,
+    "min_pt_weeks": 6,
+    "requires_xray": true,
+    "criteria": [
+      "Severe osteoarthritis (Kellgren-Lawrence Grade >= 3)",
+      "Failed conservative therapy (>= 6 weeks physical therapy)",
+      "Radiograph / X-ray evidence completed"
+    ]
+  },
+  "CMS_POL_MRI_02": {
+    "policy_id": "CMS_POL_MRI_02",
+    "payer_id": "CMS",
+    "plan_id": "CMS_MEDICARE_ADVANTAGE",
+    "cpt_code": "72148",
+    "title": "Lumbar Spine MRI Prior Authorization Guidelines",
+    "min_pt_weeks": 6,
+    "requires_xray": true,
+    "requires_neurological_deficit": true,
+    "criteria": [
+      "Low back pain with progressive neurological deficit",
+      "Failed conservative treatment (>= 6 weeks physical therapy)",
+      "Lumbar radiograph / X-ray completed"
+    ]
+  },
+  "AETNA_POL_CARDIO_03": {
+    "policy_id": "AETNA_POL_CARDIO_03",
+    "payer_id": "Aetna",
+    "plan_id": "AETNA_SILVER_HMO",
+    "cpt_code": "93458",
+    "title": "Coronary Angiography Prior Auth Policy",
+    "requires_stress_test_or_high_risk": true,
+    "requires_refractory_angina": true,
+    "criteria": [
+      "Abnormal stress test or high clinical risk",
+      "Refractory angina symptoms"
+    ]
+  }
+}
