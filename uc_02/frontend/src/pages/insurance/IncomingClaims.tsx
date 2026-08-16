@@ -11,15 +11,28 @@ export function IncomingClaims() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
 
-  const fetchData = () => {
-    setLoading(true); setError('');
+  const fetchData = (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+      setError('');
+    }
     getInsuranceClaims()
       .then(setClaims)
-      .catch(() => setError('Failed to load claims.'))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (showLoading) setError('Failed to load claims.');
+      })
+      .finally(() => {
+        if (showLoading) setLoading(false);
+      });
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData(true);
+    const timer = setInterval(() => {
+      fetchData(false);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <div className="max-w-7xl mx-auto w-full pb-10">

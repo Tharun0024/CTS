@@ -1,14 +1,16 @@
 import { Shield, CheckCircle2, XCircle, AlertTriangle, ExternalLink } from 'lucide-react';
 import type { PolicyEvidenceItem } from '../../types/claim';
 import { clsx } from 'clsx';
+import { viewPolicyDocument } from '../../utils/policyViewer';
 
 interface PolicyEvidencePanelProps {
   evidence: PolicyEvidenceItem[];
   policyName: string;
+  policyId?: string;
   portal?: 'hospital' | 'insurance';
 }
 
-export function PolicyEvidencePanel({ evidence, policyName, portal = 'hospital' }: PolicyEvidencePanelProps) {
+export function PolicyEvidencePanel({ evidence, policyName, policyId, portal = 'hospital' }: PolicyEvidencePanelProps) {
   const isHospital = portal === 'hospital';
   const accentBg   = isHospital ? 'bg-emerald-50' : 'bg-indigo-50';
   const accentIcon = isHospital ? 'text-emerald-600' : 'text-indigo-600';
@@ -27,47 +29,7 @@ export function PolicyEvidencePanel({ evidence, policyName, portal = 'hospital' 
   const metCount = finalItems.filter(i => i.status === 'MET' && !('isPending' in i && i.isPending)).length;
 
   const handleViewPolicy = () => {
-    const policyWindow = window.open('', '_blank', 'noopener,noreferrer');
-    if (!policyWindow) {
-      alert('Please allow popups to view policy details.');
-      return;
-    }
-
-    const rows = finalItems
-      .map((item) => {
-        const status = 'isPending' in item && item.isPending
-          ? 'Info Pending'
-          : item.status === 'MET'
-            ? 'Met'
-            : 'Not Met';
-        return `<tr><td style="padding:8px;border:1px solid #e2e8f0;">${item.criterion}</td><td style="padding:8px;border:1px solid #e2e8f0;">${item.patient_value}</td><td style="padding:8px;border:1px solid #e2e8f0;">${status}</td></tr>`;
-      })
-      .join('');
-
-    policyWindow.document.write(`
-      <!doctype html>
-      <html>
-        <head>
-          <title>Policy Details</title>
-          <meta charset="utf-8" />
-        </head>
-        <body style="font-family: Arial, sans-serif; padding: 24px; color: #1e293b;">
-          <h2 style="margin-top: 0;">${policyName}</h2>
-          <p>Criteria summary for this claim:</p>
-          <table style="border-collapse: collapse; width: 100%;">
-            <thead>
-              <tr>
-                <th style="text-align:left;padding:8px;border:1px solid #e2e8f0;">Criterion</th>
-                <th style="text-align:left;padding:8px;border:1px solid #e2e8f0;">Supporting Evidence</th>
-                <th style="text-align:left;padding:8px;border:1px solid #e2e8f0;">Status</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </body>
-      </html>
-    `);
-    policyWindow.document.close();
+    viewPolicyDocument(policyId || 'CPB-0660', policyName, isHospital ? 'City Hospital Payer' : 'Insurance Partner');
   };
 
   return (

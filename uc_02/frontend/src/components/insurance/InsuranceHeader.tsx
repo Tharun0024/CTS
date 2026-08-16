@@ -126,13 +126,6 @@ export function InsuranceHeader({ setIsMobileOpen, isCollapsed, setIsCollapsed }
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="hidden lg:flex flex-col items-end mr-2">
-          <span className="text-[12px] font-bold text-slate-800">Aetna</span>
-          <div className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-            <span className="text-[10px] uppercase tracking-wider text-indigo-600 font-bold">Online</span>
-          </div>
-        </div>
 
         <button
           onClick={() => navigate('/insurance/notifications')}

@@ -15,15 +15,28 @@ export function InsuranceDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
 
-  const fetchData = () => {
-    setLoading(true); setError('');
+  const fetchData = (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+      setError('');
+    }
     Promise.all([getInsuranceClaims(), getReviews()])
       .then(([c, r]) => { setClaims(c); setReviews(r); })
-      .catch(() => setError('Failed to load dashboard data.'))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (showLoading) setError('Failed to load dashboard data.');
+      })
+      .finally(() => {
+        if (showLoading) setLoading(false);
+      });
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData(true);
+    const timer = setInterval(() => {
+      fetchData(false);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, []);
 
   const count = (status: string) => claims.filter(c => c.status === status).length;
   const pendingReviews = reviews.filter(r => r.status !== 'COMPLETED').length;

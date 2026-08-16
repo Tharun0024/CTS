@@ -2,8 +2,26 @@ import { mockRequest } from './api';
 import { mockClaimDetails } from '../mock/claims';
 import type { Claim, ClaimDetails, CreateClaimPayload } from '../types/claim';
 
-// Mutable in-memory state for the current session
-let claimsStore: ClaimDetails[] = [...mockClaimDetails];
+const LOCAL_STORAGE_KEY = 'authflow_claims_store';
+
+function loadClaimsStore(): ClaimDetails[] {
+  const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      console.error('Failed to parse saved claims', e);
+    }
+  }
+  return [...mockClaimDetails];
+}
+
+export function saveClaimsStore(store: ClaimDetails[]) {
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(store));
+}
+
+// Mutable in-memory state for the current session, loaded from localStorage
+let claimsStore: ClaimDetails[] = loadClaimsStore();
 
 // GET /api/claims
 export async function getClaims(): Promise<Claim[]> {
@@ -39,7 +57,7 @@ export async function getClaimDetails(id: string): Promise<ClaimDetails> {
 // POST /api/claims
 export async function createClaim(payload: CreateClaimPayload): Promise<ClaimDetails> {
   const newId = `CLM-${String(claimsStore.length + 1).padStart(3, '0')}`;
-  
+
   const missing: string[] = [];
   if (!payload.patient_id) missing.push('Patient Identification');
   if (!payload.procedure) missing.push('Procedure Details');
@@ -50,10 +68,10 @@ export async function createClaim(payload: CreateClaimPayload): Promise<ClaimDet
 
   const newClaim: ClaimDetails = {
     claim_id: newId,
-    patient: { 
-      patient_id: payload.patient_id || 'PAT-UNSPECIFIED', 
-      age: 0, 
-      gender: 'Unknown' 
+    patient: {
+      patient_id: payload.patient_id || 'PAT-UNSPECIFIED',
+      age: 0,
+      gender: 'Unknown'
     },
     claim: {
       procedure: payload.procedure || 'Unspecified Procedure',
@@ -62,10 +80,10 @@ export async function createClaim(payload: CreateClaimPayload): Promise<ClaimDet
       service_date: payload.service_date || new Date().toISOString().split('T')[0],
       provider_id: payload.provider_id || '',
     },
-    policy: { 
-      payer: payload.payer || 'Unspecified Payer', 
-      policy_id: payload.policy_id || 'N/A', 
-      policy_name: `${payload.payer || 'Unspecified'} Policy` 
+    policy: {
+      payer: payload.payer || 'Unspecified Payer',
+      policy_id: payload.policy_id || 'N/A',
+      policy_name: `${payload.payer || 'Unspecified'} Policy`
     },
     decision: missing.length > 0 ? {
       status: 'MORE_INFORMATION',
@@ -106,8 +124,9 @@ export async function createClaim(payload: CreateClaimPayload): Promise<ClaimDet
       }] : [])
     ],
   };
-  
+
   claimsStore = [newClaim, ...claimsStore];
+  saveClaimsStore(claimsStore);
 
   // Simulate async status transition only if no missing fields, or keep as MORE_INFO if missing
   if (missing.length === 0) {
@@ -123,6 +142,7 @@ export async function createClaim(payload: CreateClaimPayload): Promise<ClaimDet
             { timestamp: new Date().toISOString(), event: 'PROCESSING', message: 'Claim transitioned to processing' }
           ]
         };
+        saveClaimsStore(claimsStore);
       }
     }, 2000);
   }
@@ -155,6 +175,7 @@ export async function resubmitClaim(id: string): Promise<{ success: boolean; cla
         { timestamp: new Date().toISOString(), event: 'SUBMITTED_AGAIN', message: 'Claim resubmitted' },
       ],
     };
+    saveClaimsStore(claimsStore);
   }
   return mockRequest({ success: true, claim_id: id }, 500);
 }

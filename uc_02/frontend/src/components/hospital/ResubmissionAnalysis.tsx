@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Loader2, TrendingUp, RotateCcw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { getResubmissionAnalysis } from '../../services/resubmissionApi';
-import { resubmitClaim } from '../../services/claimsApi';
+import { resubmitClaim, getClaimsStore, saveClaimsStore } from '../../services/claimsApi';
 import type { ResubmissionAnalysis as ResubAnalysis } from '../../types/resubmission';
 import { clsx } from 'clsx';
 
@@ -30,6 +30,36 @@ export function ResubmissionAnalysis({ claimId, onResubmitted }: ResubmissionAna
     try { await resubmitClaim(claimId); setSubmitted(true); onResubmitted?.(); }
     catch { setError('Resubmission failed. Please try again.'); }
     finally { setSubmitting(false); }
+  };
+
+  const handleEscalateToHuman = async () => {
+    setSubmitting(true);
+    try {
+      const store = getClaimsStore();
+      const idx = store.findIndex(c => c.claim_id === claimId);
+      if (idx !== -1) {
+        store[idx] = {
+          ...store[idx],
+          status: 'HUMAN_REVIEW',
+          updated_at: new Date().toISOString(),
+          timeline: [
+            ...(store[idx].timeline ?? []),
+            {
+              timestamp: new Date().toISOString(),
+              event: 'HUMAN_REVIEW',
+              message: 'Claim escalated to Human Review by provider.'
+            }
+          ]
+        };
+        saveClaimsStore(store);
+      }
+      setSubmitted(true);
+      onResubmitted?.();
+    } catch {
+      setError('Escalation failed. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) return (
@@ -132,7 +162,11 @@ export function ResubmissionAnalysis({ claimId, onResubmitted }: ResubmissionAna
               </button>
             )}
             {!isRed && (
-              <button className="flex items-center justify-center gap-2 px-5 py-3 border border-slate-200 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-800 text-slate-600 text-[12px] font-bold rounded-xl transition-all">
+              <button
+                onClick={handleEscalateToHuman}
+                disabled={submitting}
+                className="flex items-center justify-center gap-2 px-5 py-3 border border-slate-200 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-800 text-slate-600 text-[12px] font-bold rounded-xl transition-all disabled:opacity-60"
+              >
                 <AlertTriangle className="w-4 h-4" /> Human Review
               </button>
             )}

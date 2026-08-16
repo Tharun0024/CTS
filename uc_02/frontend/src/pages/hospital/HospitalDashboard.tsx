@@ -19,17 +19,25 @@ export function HospitalDashboard() {
   const [priorityClaims, setPriorityClaims] = useState<ClaimDetails[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = () => {
-    setLoading(true);
+  const fetchData = (showLoading = true) => {
+    if (showLoading) setLoading(true);
     getClaims().then(async (data) => {
       setClaims(data);
       const priority = data.filter(c => ['REJECTED', 'MORE_INFO', 'HUMAN_REVIEW'].includes(c.status));
       const detailed = await Promise.all(priority.slice(0, 5).map(c => getClaimDetails(c.claim_id).catch(() => null)));
       setPriorityClaims(detailed.filter(Boolean) as ClaimDetails[]);
-    }).finally(() => setLoading(false));
+    }).finally(() => {
+      if (showLoading) setLoading(false);
+    });
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData(true);
+    const timer = setInterval(() => {
+      fetchData(false);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleRefresh = () => {
     setIsRefreshing(true);

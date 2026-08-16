@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Stethoscope, Edit2 } from 'lucide-react';
 import type { ClaimDetails } from '../../types/claim';
 import { clsx } from 'clsx';
@@ -24,6 +25,28 @@ export function ClinicalInfoCard({ claim, portal = 'hospital' }: ClinicalInfoCar
   const accentIcon = isHospital ? 'text-emerald-600' : 'text-indigo-600';
   const editColor = isHospital ? 'text-emerald-600 hover:text-emerald-800' : 'text-indigo-600 hover:text-indigo-800';
 
+  const [procedure, setProcedure] = useState(claim.procedure || 'Total Knee Replacement');
+  const [code, setCode] = useState(claim.procedure_code || '27447');
+  const [doctor, setDoctor] = useState('Dr. Arjun Prasad');
+
+  useEffect(() => {
+    setProcedure(claim.procedure || 'Total Knee Replacement');
+    setCode(claim.procedure_code || '27447');
+  }, [claim]);
+
+  const handleEdit = () => {
+    const nextProc = window.prompt('Edit Procedure Name:', procedure);
+    if (nextProc === null) return;
+    const nextCode = window.prompt('Edit Procedure Code:', code);
+    if (nextCode === null) return;
+    const nextDoc = window.prompt('Edit Treating Doctor:', doctor);
+    if (nextDoc === null) return;
+
+    setProcedure(nextProc.trim() || procedure);
+    setCode(nextCode.trim() || code);
+    setDoctor(nextDoc.trim() || doctor);
+  };
+
   return (
     <div className="glass-panel rounded-2xl overflow-hidden animate-fade-in-up stagger-1 shadow-sm">
       <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/60">
@@ -35,20 +58,20 @@ export function ClinicalInfoCard({ claim, portal = 'hospital' }: ClinicalInfoCar
         </div>
         <button
           type="button"
-          onClick={() => alert('Edit clinical details')}
+          onClick={handleEdit}
           className={clsx('text-[11px] font-bold flex items-center gap-1 transition-colors', editColor)}
         >
           <Edit2 className="w-3 h-3" /> Edit
         </button>
       </div>
       <div className="px-5 py-3">
-        <Row label="Diagnosis" value={claim.procedure || 'Acute Appendicitis'} highlight />
-        <Row label="ICD Code" value={claim.procedure_code || 'K35.80'} mono />
-        <Row label="Treatment" value={claim.procedure || 'Appendectomy'} />
+        <Row label="Diagnosis" value={procedure} highlight />
+        <Row label="ICD Code" value={code} mono />
+        <Row label="Treatment" value={procedure} />
         <Row label="Admission Date" value={new Date(claim.service_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} />
         <Row label="Discharge Date" value={new Date(claim.service_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} />
         <Row label="Hospital" value="Sunrise Hospital" />
-        <Row label="Treating Doctor" value="Dr. Arjun Prasad" highlight />
+        <Row label="Treating Doctor" value={doctor} highlight />
       </div>
     </div>
   );

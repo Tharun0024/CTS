@@ -11,6 +11,7 @@ import { LoadingState } from '../../components/common/LoadingState';
 import { ErrorState } from '../../components/common/ErrorState';
 
 import { getClaimDetails } from '../../services/claimsApi';
+import { viewPolicyDocument } from '../../utils/policyViewer';
 import { usePolling, isTerminalStatus } from '../../services/polling';
 import type { ClaimDetails } from '../../types/claim';
 import { CheckCircle2, AlertTriangle, Users, Loader2, Shield, Clock } from 'lucide-react';
@@ -20,9 +21,9 @@ import { Button } from '../../components/ui/Button';
 
 export function HospitalClaimDetails() {
   const { id } = useParams<{ id: string }>();
-  const [claim, setClaim]   = useState<ClaimDetails | null>(null);
+  const [claim, setClaim] = useState<ClaimDetails | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState('');
+  const [error, setError] = useState('');
   const [showResub, setShowResub] = useState(false);
 
   const fetchClaim = useCallback(async () => {
@@ -58,44 +59,21 @@ export function HospitalClaimDetails() {
 
   /* Status banners config */
   const banners: Record<string, { icon: any; title: string; msg: string; cls: string; iconCls: string }> = {
-    PROCESSING:  { icon: Loader2,       title: 'Processing Claim',            msg: 'Extracting data and running policy analysis… This page updates automatically.',  cls: 'bg-violet-50 border-violet-200',   iconCls: 'text-violet-600' },
-    SUBMITTED:   { icon: Loader2,       title: 'Claim Received',              msg: 'Processing documents… Average wait: 2–3 minutes.',                               cls: 'bg-violet-50 border-violet-200',   iconCls: 'text-violet-600' },
-    UNDER_REVIEW:{ icon: Loader2,       title: 'Under Review',                msg: 'Policy criteria under review…',                                                  cls: 'bg-violet-50 border-violet-200',   iconCls: 'text-violet-600' },
-    ACCEPTED:    { icon: CheckCircle2,  title: 'Claim Accepted',              msg: claim.decision?.reason || '',                                                     cls: 'bg-emerald-50 border-emerald-200', iconCls: 'text-emerald-600' },
-    MORE_INFO:   { icon: AlertTriangle, title: 'Additional Information Required', msg: claim.decision?.reason || '', cls: 'bg-amber-50 border-amber-200',             iconCls: 'text-amber-600' },
-    HUMAN_REVIEW:{ icon: Users,         title: 'Human Review Required',       msg: claim.decision?.reason || '', cls: 'bg-blue-50 border-blue-200',                  iconCls: 'text-blue-600' },
-    RESUBMISSION_CHECK:{ icon: Shield,  title: 'Resubmission Under Analysis', msg: 'Checking all criteria for resubmission eligibility…',                            cls: 'bg-indigo-50 border-indigo-200',  iconCls: 'text-indigo-600' },
-    SUBMITTED_AGAIN:   { icon: CheckCircle2, title: 'Claim Resubmitted',     msg: 'Awaiting review by the insurer.',                                                 cls: 'bg-sky-50 border-sky-200',        iconCls: 'text-sky-600' },
+    PROCESSING: { icon: Loader2, title: 'Processing Claim', msg: 'Extracting data and running policy analysis… This page updates automatically.', cls: 'bg-violet-50 border-violet-200', iconCls: 'text-violet-600' },
+    SUBMITTED: { icon: Loader2, title: 'Claim Received', msg: 'Processing documents… Average wait: 2–3 minutes.', cls: 'bg-violet-50 border-violet-200', iconCls: 'text-violet-600' },
+    UNDER_REVIEW: { icon: Loader2, title: 'Under Review', msg: 'Policy criteria under review…', cls: 'bg-violet-50 border-violet-200', iconCls: 'text-violet-600' },
+    ACCEPTED: { icon: CheckCircle2, title: 'Claim Accepted', msg: claim.decision?.reason || '', cls: 'bg-emerald-50 border-emerald-200', iconCls: 'text-emerald-600' },
+    MORE_INFO: { icon: AlertTriangle, title: 'Additional Information Required', msg: claim.decision?.reason || '', cls: 'bg-amber-50 border-amber-200', iconCls: 'text-amber-600' },
+    HUMAN_REVIEW: { icon: Users, title: 'Human Review Required', msg: claim.decision?.reason || '', cls: 'bg-blue-50 border-blue-200', iconCls: 'text-blue-600' },
+    RESUBMISSION_CHECK: { icon: Shield, title: 'Resubmission Under Analysis', msg: 'Checking all criteria for resubmission eligibility…', cls: 'bg-indigo-50 border-indigo-200', iconCls: 'text-indigo-600' },
+    SUBMITTED_AGAIN: { icon: CheckCircle2, title: 'Claim Resubmitted', msg: 'Awaiting review by the insurer.', cls: 'bg-sky-50 border-sky-200', iconCls: 'text-sky-600' },
   };
 
   const banner = banners[claim.status];
   const BannerIcon = banner?.icon;
-  const isSpinning = ['PROCESSING','SUBMITTED','UNDER_REVIEW'].includes(claim.status);
+  const isSpinning = ['PROCESSING', 'SUBMITTED', 'UNDER_REVIEW'].includes(claim.status);
   const handleViewPolicyDetails = () => {
-    const policyWindow = window.open('', '_blank', 'noopener,noreferrer');
-    if (!policyWindow) {
-      alert('Please allow popups to view policy details.');
-      return;
-    }
-
-    policyWindow.document.write(`
-      <!doctype html>
-      <html>
-        <head>
-          <title>Policy Details</title>
-          <meta charset="utf-8" />
-        </head>
-        <body style="font-family: Arial, sans-serif; padding: 24px; color: #1e293b;">
-          <h2 style="margin-top: 0;">${claim.policy.policy_name}</h2>
-          <p><strong>Payer:</strong> ${claim.policy.payer}</p>
-          <p><strong>Policy ID:</strong> ${claim.policy.policy_id}</p>
-          <p><strong>Plan:</strong> ${claim.policy.payer} Secure Plus</p>
-          <p><strong>Start Date:</strong> Jan 01, 2025</p>
-          <p><strong>End Date:</strong> Dec 31, 2025</p>
-        </body>
-      </html>
-    `);
-    policyWindow.document.close();
+    viewPolicyDocument(claim.policy.policy_id, claim.policy.policy_name, claim.policy.payer);
   };
 
   return (
@@ -148,10 +126,10 @@ export function HospitalClaimDetails() {
               </span>
             </CardHeader>
             <CardContent className="p-5 space-y-6">
-              
+
               {/* Grid for Evidence Request & Response */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
+
                 {/* 1. Evidence Request */}
                 {claim.evidence_request ? (
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2.5">
@@ -246,7 +224,7 @@ export function HospitalClaimDetails() {
               {/* 4. Attempt / Resubmission visual timeline */}
               <div className="border-t border-slate-100 pt-4 space-y-3">
                 <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-wider">Submissions & Attempts</h4>
-                
+
                 <div className="flex flex-col sm:flex-row items-stretch gap-4 justify-between">
                   {/* Attempt 1 block */}
                   <div className="flex-1 bg-slate-50/50 border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
@@ -298,7 +276,7 @@ export function HospitalClaimDetails() {
           </Card>
 
           {claim.policy_evidence.length > 0 && (
-            <PolicyEvidencePanel evidence={claim.policy_evidence} policyName={claim.policy.policy_name} portal="hospital" />
+            <PolicyEvidencePanel evidence={claim.policy_evidence} policyName={claim.policy.policy_name} policyId={claim.policy.policy_id} portal="hospital" />
           )}
 
           {claim.status === 'MORE_INFO' && claim.missing_information.length > 0 && (
@@ -333,9 +311,9 @@ export function HospitalClaimDetails() {
             </CardHeader>
             <CardContent className="px-5 py-4 space-y-3">
               {[
-                { label: 'Policy Plan',   value: `${claim.policy.payer} Secure Plus`, accent: false },
-                { label: 'Start Date',    value: 'Jan 01, 2025',       accent: false },
-                { label: 'End Date',      value: 'Dec 31, 2025',       accent: false },
+                { label: 'Policy Plan', value: `${claim.policy.payer} Secure Plus`, accent: false },
+                { label: 'Start Date', value: 'Jan 01, 2025', accent: false },
+                { label: 'End Date', value: 'Dec 31, 2025', accent: false },
               ].map(r => (
                 <div key={r.label} className="flex items-baseline justify-between border-b border-slate-50 pb-2 last:border-0 last:pb-0">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{r.label}</span>

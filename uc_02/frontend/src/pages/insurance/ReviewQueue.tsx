@@ -10,15 +10,28 @@ export function ReviewQueue() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
 
-  const fetchData = () => {
-    setLoading(true); setError('');
+  const fetchData = (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+      setError('');
+    }
     getReviews()
       .then(setReviews)
-      .catch(() => setError('Failed to load review queue.'))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (showLoading) setError('Failed to load review queue.');
+      })
+      .finally(() => {
+        if (showLoading) setLoading(false);
+      });
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData(true);
+    const timer = setInterval(() => {
+      fetchData(false);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <div className="max-w-7xl mx-auto w-full pb-10">
