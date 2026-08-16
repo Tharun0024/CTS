@@ -1,18 +1,30 @@
 # Prior Authorization Policy Retrieval RAG System & Clinical Decision Agent
 
-A comprehensive, high-performance, and clinically-grounded semantic search retrieval system and clinical decision engine for Prior Authorization (PA) medical policies.
+A comprehensive, high-performance, and clinically-grounded semantic search retrieval system and clinical decision engine for Prior Authorization (PA) medical policies, with a closed-loop provider-side recovery layer (Agent 2) integrated into the real Version-1 pipeline.
 
 ---
 
 ## 1. Project Architecture
 
-The codebase separates concerns across adapters, RAG-specific schemas, semantic search/retrieval internals, the deterministic clinical decision agent (Agent 1), and end-to-end orchestration services:
+The codebase separates concerns across adapters, RAG-specific schemas, semantic search/retrieval internals, the deterministic clinical decision agent (Agent 1), the provider-side recovery layer (Agent 2), and end-to-end orchestration services:
 
 ```text
-Y:\CTS
+cts/
 ├── adapters/            # Translation/adaptation layers
 │   ├── rag_adapter.py     # Maps ClaimInput and legacy Policy criteria formatting
-│   └── runtime_adapter.py # Normalizes Version-1 runtime data to CanonicalClaim
+│   └── runtime_adapter.py # Normalizes Version-1 runtime data to CanonicalClaim;
+│                          # get_provider_evidence_pool reads ONLY the provider DB
+├── agent2/              # Agent 2: provider-side recovery & resubmission layer
+│   ├── audit/             # AuditLogger: SQLite-persisted state transitions
+│   ├── config.py          # NVIDIA settings + MAX_RESUBMISSION_ATTEMPTS (3)
+│   ├── database/          # Provider DB access (repositories, importer)
+│   ├── payer/             # Agent1Client boundary (payer responses in only)
+│   ├── reasoning/         # RejectionAnalyzer (search concepts), CriterionMapper
+│   ├── retrieval/         # Provider-side evidence retrieval & ranking
+│   ├── schemas/           # Pydantic contracts (Evidence, PayerResponse, ...)
+│   ├── submission/        # BoundaryFilter, PackageBuilder, VersionManager
+│   ├── validators/        # Claim/evidence/LLM-output/submission validators
+│   └── workflow/          # PriorAuthOrchestrator state machine
 ├── api/
 │   └── main.py          # Thin FastAPI routes delegating orchestration to services
 ├── config/
@@ -45,8 +57,8 @@ Y:\CTS
 ├── reports/             # Generated reports (benchmarks, data quality, dataset profile)
 ├── scripts/             # Admin, indexing, and debugging utilities
 ├── services/            # Service orchestration layer
-│   └── integrated_pipeline.py # Core integration loop orchestrator
-├── tests/               # Pytest verification suites
+│   └── integrated_pipeline.py # Agent 1 pipeline + Agent 2 versioned recovery loop
+├── tests/               # Pytest verification suites (incl. Agent 2 e2e scenarios A–K)
 └── transformation/
     └── canonical_claim.py # Stable domain-model contract (CanonicalClaim)
 ```
@@ -70,7 +82,44 @@ Y:\CTS
 
 ---
 
-## 3. RAG vs LLM Responsibilities
+## 3. Agent 2: Provider-Side Recovery in the Real V1 Pipeline
+
+Agent 2 is integrated through `services/integrated_pipeline.py` (`run_agent2_v1_pipeline` / `run_agent2_pipeline_from_db`). Every claim version — V1, V2, V3 — is re-decided by the **same** Agent 1 + RAG path; Agent 2 never makes coverage decisions and never duplicates Agent 1.
+
+```text
+CanonicalClaim -> RAG -> Agent 1 -> DecisionResponse -> routing
+   -> (recoverable?) Agent 2 provider-evidence recovery -> release gate
+   -> SubmissionPackage (new_evidence_delta) -> Agent 1 again -> final outcome
+```
+
+### V1 Routing Contract
+
+| Agent 1 outcome / claim condition | Route | Agent 2 |
+|---|---|---|
+| `APPROVE` | Terminal | not invoked |
+| `REJECT` with coverage exclusion | Hard terminal `REJECT` | not invoked |
+| Lapsed eligibility (`eligibility_eligible=False`, coverage INACTIVE/LAPSED/TERMINATED/EXPIRED) | Terminal administrative `REJECT` | not invoked |
+| Filing deadline exceeded (`filing_deadline_exceeded=True` / status EXCEEDED) | Terminal administrative `REJECT` | not invoked |
+| Recoverable `REJECT` / `REQUEST_MORE_INFORMATION` (documentation, coding, medical necessity) | Recovery loop | invoked |
+| `HUMAN_REVIEW` | Terminal | no direct recovery |
+
+### Evidence Safety Guarantees
+
+* **FOUND ≠ SATISFIED**: recovered provider evidence is only *found*; satisfaction is decided exclusively by Agent 1 re-evaluation of the new claim version.
+* **Anti-fabrication provenance guard**: only records physically present in the provider evidence pool (by `evidence_id`) may enter a resubmission; nothing is ever invented.
+* **Sensitivity release gate**: only `ROUTINE` evidence is released programmatically; `PROTECTED_*` and `UNKNOWN` sensitivity block the release and escalate to `HUMAN_REVIEW`.
+* **Minimum necessary**: recovery selects only evidence matching Agent 1's requested keys / requested concepts.
+* **Immutable versions**: claim snapshots are append-only (V1 → V2 → V3); each resubmission carries `new_evidence_delta` with only the newly added evidence IDs; history is never overwritten.
+* **Bounded loop**: recovery is capped by `MAX_RESUBMISSION_ATTEMPTS` (default 3, `agent2/config.py`); when reached the pipeline stops safely and escalates to `HUMAN_REVIEW`.
+
+### Trust Boundaries
+
+* Agent 1 and the RAG pipeline never access the Big Patient Record (provider DB).
+* Agent 2 never accesses payer-side data; it reads the provider evidence pool only (`adapters/runtime_adapter.py::get_provider_evidence_pool`) and consumes payer responses through the `PayerResponse` contract.
+
+---
+
+## 4. RAG vs LLM Responsibilities
 
 ### Policy Retrieval & Analysis (Deterministic)
 The policy intelligence layer is performed before LLM generation by the local RAG pipeline:
@@ -78,14 +127,14 @@ The policy intelligence layer is performed before LLM generation by the local RA
 2. Candidate pool reranking (BGEReranker) and single-policy consistency aggregation.
 3. Deterministic clinical criteria analysis and Evidence Object construction.
 
-### NVIDIA LLM Scope (Structured Formatting)
-The final generation/extraction layer uses NVIDIA Llama 3.1 8B Instruct through NVIDIA's OpenAI-compatible API.
-* **Scope:** It is responsible **only** for converting the grounded Evidence Object and user records into structured JSON formats matching the target schemas.
-* **Grounding:** The LLM does not execute policy selection, clinical eligibility decisions, or evaluate exclusions, preventing hallucinated outcomes.
+### NVIDIA LLM Scope (Structured Formatting & Interpretation Only)
+The generation/extraction layer uses NVIDIA Llama 3.1 8B Instruct through NVIDIA's OpenAI-compatible API.
+* **Scope:** converting grounded Evidence Objects and records into structured JSON matching the target schemas, and (in Agent 2) interpreting payer rejection text into search concepts via `RejectionAnalyzer`.
+* **Grounding:** the LLM never executes policy selection, clinical eligibility decisions, or exclusion evaluation — the coverage decision is always deterministic. Malformed or decision-leaking LLM output fails closed to `HUMAN_REVIEW`.
 
 ---
 
-## 4. Installation & Setup
+## 5. Installation & Setup
 
 1. **Requirements**:
    * Python 3.12+
@@ -101,14 +150,17 @@ The final generation/extraction layer uses NVIDIA Llama 3.1 8B Instruct through 
    ```bash
    cp .env.example .env
    ```
-   Configure your NVIDIA API key in `.env`:
+   Configure your NVIDIA settings in `.env` (used only for structured formatting / rejection interpretation — never for the coverage decision):
    ```env
    NVIDIA_API_KEY=your_nvidia_api_key_here
+   NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
+   NVIDIA_MODEL=meta/llama-3.1-8b-instruct
    ```
+   The system remains runnable without an API key (deterministic fallback paths).
 
 ---
 
-## 5. Execution Guide
+## 6. Execution Guide
 
 Run all steps directly using the Python environment:
 
@@ -119,10 +171,11 @@ python -m scripts.build_index
 ```
 
 ### 2. Run Test Suite
-Runs the comprehensive Pytest verification test suite:
+Runs the comprehensive Pytest verification suites (main suite plus Agent 2 routing tests — 178 tests):
 ```bash
-python -m pytest -v
+python -m pytest tests agent2/tests/test_orchestrator_routing.py -v
 ```
+End-to-end Agent 2 scenarios (A–K: approve, recovery-to-approve, recoverable reject, unfound evidence, conflicting recovery, exclusion terminal, lapsed eligibility, filing deadline, human review, sensitive block, attempt cap) live in `tests/test_agent2_v1_end_to_end.py`.
 
 ### 3. Evaluate Pipeline
 Runs evaluation queries against the retrieval engine and calculates Recall@K, MRR, and contamination metrics:
@@ -150,8 +203,9 @@ python -m scripts.query_pipeline data/test_claim_aetna_knee.json
 
 ---
 
-## 6. Security
+## 7. Security
 
 * API keys must be stored in environment variables (configured via `.env`).
 * API keys must never be hardcoded or committed to version control.
 * `.cache/`, `.venv/`, `.env/`, and generated `vector_store/` caches are excluded from version control.
+* Administrative denials (lapsed eligibility, filing deadline) and coverage exclusions are enforced deterministically by programmatic gates — never by the LLM.
