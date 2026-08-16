@@ -9,6 +9,13 @@ from .submission import SubmissionPackage
 from .payer_response import PayerResponse
 from .agent2_result import Agent2Result
 from .policy import PolicyCriterion, CriterionEvaluation
+from .evidence_request import (
+    EvidenceProvenanceRef,
+    EvidenceRecoveryResult,
+    EvidenceRequest,
+    RequestedItemResult,
+    RequestedItemState,
+)
 
 __all__ = [
     "CanonicalClaim",
@@ -21,4 +28,9 @@ __all__ = [
     "Agent2Result",
     "PolicyCriterion",
     "CriterionEvaluation",
+    "EvidenceRequest",
+    "RequestedItemState",
+    "RequestedItemResult",
+    "EvidenceProvenanceRef",
+    "EvidenceRecoveryResult",
 ]

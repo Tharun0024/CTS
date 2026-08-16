@@ -24,4 +24,5 @@ __all__ = [
     "payer",
     "audit",
     "validators",
+    "recovery",
 ]

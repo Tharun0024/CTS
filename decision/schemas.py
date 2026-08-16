@@ -16,6 +16,32 @@ class DecisionOutcome(str, Enum):
     HUMAN_REVIEW = "HUMAN_REVIEW"
 
 
+class DecisionReasonCode(str, Enum):
+    """Machine-readable reason codes attached to every Agent1 DecisionResponse.
+
+    Routing contract (V1, frozen):
+      - APPROVE (ALL_CRITERIA_SATISFIED) -> terminal.
+      - REQUEST_MORE_INFORMATION (MISSING_DOCUMENTATION) -> Agent2 recovery.
+      - REJECT (COVERAGE_EXCLUSION / CRITERION_FAILED_HARD) -> terminal hard
+        denial; Agent2 is NEVER invoked. There is no generic REJECT recovery.
+      - HUMAN_REVIEW (all HUMAN_REVIEW_* codes) -> human workflow; Agent2 is
+        NOT directly invoked.
+    """
+    ALL_CRITERIA_SATISFIED = "ALL_CRITERIA_SATISFIED"
+    COVERAGE_EXCLUSION = "COVERAGE_EXCLUSION"
+    CRITERION_FAILED_HARD = "CRITERION_FAILED_HARD"
+    MISSING_DOCUMENTATION = "MISSING_DOCUMENTATION"
+    EVIDENCE_CONFLICT = "EVIDENCE_CONFLICT"
+    UNRELIABLE_EXCLUSION_EVIDENCE = "UNRELIABLE_EXCLUSION_EVIDENCE"
+    UNKNOWN_PAYER = "UNKNOWN_PAYER"
+    POLICY_VALIDATION_ERROR = "POLICY_VALIDATION_ERROR"
+    LLM_ASSESSMENT_FAIL_CLOSED = "LLM_ASSESSMENT_FAIL_CLOSED"
+    ENGINE_FAIL_CLOSED = "ENGINE_FAIL_CLOSED"
+    NO_MATCHING_POLICY = "NO_MATCHING_POLICY"
+    PIPELINE_FAIL_CLOSED = "PIPELINE_FAIL_CLOSED"
+    PROVIDER_CLAIM_NOT_FOUND = "PROVIDER_CLAIM_NOT_FOUND"
+
+
 class CriterionAssessmentStatus(str, Enum):
     """Permitted LLM assessment states for one RAG policy criterion."""
     SATISFIED = "SATISFIED"
@@ -171,6 +197,18 @@ class CriterionEvaluation(BaseModel):
 class DecisionResponse(BaseModel):
     """
     The output decision returned by the decision agent.
+
+    Stable Agent1 decision contract (V1):
+      - ``outcome``: final decision (Agent1 owns it).
+      - ``reason_code``: machine-readable reason (DecisionReasonCode).
+      - ``criteria_results`` / ``criteria_evaluations``: per-criterion results
+        with evidence IDs/provenance.
+      - ``referenced_evidence_ids``: real evidence IDs grounded in the decision.
+      - ``requested_information``: populated ONLY when outcome is
+        REQUEST_MORE_INFORMATION (policy-defined documentation requests).
+      - ``agent2_recoverable``: True ONLY for REQUEST_MORE_INFORMATION.
+        REJECT / APPROVE / HUMAN_REVIEW are terminal for Agent2 routing;
+        there is no generic REJECT -> Agent2 recovery rule.
     """
     case_id: str
     outcome: DecisionOutcome
@@ -184,3 +222,18 @@ class DecisionResponse(BaseModel):
     claim_id: Optional[str] = None
     policy_id: Optional[str] = None
     submission_attempt: Optional[int] = None
+    reason_code: Optional[DecisionReasonCode] = None
+    requested_information: List[str] = Field(default_factory=list)
+    referenced_evidence_ids: List[str] = Field(default_factory=list)
+    agent2_recoverable: bool = False
+
+    @model_validator(mode="after")
+    def enforce_routing_semantics(self) -> "DecisionResponse":
+        """Frozen V1 routing semantics: only REQUEST_MORE_INFORMATION routes to
+        Agent2 recovery, and only it may carry requested information."""
+        if self.outcome != DecisionOutcome.REQUEST_MORE_INFORMATION:
+            if self.agent2_recoverable:
+                self.agent2_recoverable = False
+            if self.requested_information:
+                self.requested_information = []
+        return self

@@ -7,6 +7,7 @@ from decision.schemas import (
     EvidenceItem,
     EvidenceStatus,
     DecisionOutcome,
+    DecisionReasonCode,
     DecisionResponse,
     CanonicalClaim,
     CriterionAssessment,
@@ -608,6 +609,7 @@ class DecisionAgent:
                         claim_id=claim_id,
                         policy_id=policy_id,
                         submission_attempt=submission_attempt,
+                        reason_code=DecisionReasonCode.LLM_ASSESSMENT_FAIL_CLOSED,
                     )
             
             if legacy_mode:
@@ -856,6 +858,7 @@ class DecisionAgent:
                     criteria_evaluations={},
                     evidence_status={},
                     errors=errors,
+                    reason_code=DecisionReasonCode.LLM_ASSESSMENT_FAIL_CLOSED,
                 )
 
         # 6. Fallback or transition to the deterministic decision engine

@@ -2,6 +2,7 @@ from decision.agent import DecisionAgent
 from decision.schemas import (
     EvidenceStatus,
     DecisionOutcome,
+    DecisionReasonCode,
     Rule,
     PolicyExclusion,
     PolicyCriterion,
@@ -19,6 +20,7 @@ __all__ = [
     "DecisionAgent",
     "EvidenceStatus",
     "DecisionOutcome",
+    "DecisionReasonCode",
     "Rule",
     "PolicyExclusion",
     "PolicyCriterion",

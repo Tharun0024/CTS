@@ -7,7 +7,7 @@ from models.rag_models import ClaimInput
 from adapters.rag_adapter import rag_claim_adapter, rag_policy_adapter
 from adapters.runtime_adapter import RuntimeAdapter
 from rag.normalization.input_normalizer import normalize_claim_input
-from decision.schemas import DecisionResponse, DecisionOutcome
+from decision.schemas import DecisionResponse, DecisionOutcome, DecisionReasonCode
 from decision.agent import DecisionAgent
 
 def run_integrated_pipeline(canonical_claim: Dict[str, Any], components: Dict[str, Any]) -> Any:
@@ -201,7 +201,8 @@ def run_integrated_pipeline(canonical_claim: Dict[str, Any], components: Dict[st
                 criteria_evaluations={},
                 evidence_status={},
                 errors=["RAG failed to retrieve any criteria for the requested procedures."],
-                claim_id=canonical_claim.get("claim_id")
+                claim_id=canonical_claim.get("claim_id"),
+                reason_code=DecisionReasonCode.NO_MATCHING_POLICY,
             )
         
         # 5. Execute Agent 1 Decision logic (Constraint 14 & 15)
@@ -249,7 +250,8 @@ def run_integrated_pipeline(canonical_claim: Dict[str, Any], components: Dict[st
             criteria_evaluations={},
             evidence_status={},
             errors=[f"Integrated pipeline critical error: {e}"],
-            claim_id=canonical_claim.get("claim_id")
+            claim_id=canonical_claim.get("claim_id"),
+            reason_code=DecisionReasonCode.PIPELINE_FAIL_CLOSED,
         )
 
 
@@ -283,6 +285,7 @@ def run_pipeline_from_db(
             evidence_status={},
             errors=["Provider claim or payer context not found in V1 databases."],
             claim_id=claim_id,
+            reason_code=DecisionReasonCode.PROVIDER_CLAIM_NOT_FOUND,
         )
 
     return run_integrated_pipeline(linked_claim, components)

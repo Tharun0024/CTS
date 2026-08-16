@@ -7,6 +7,7 @@ from decision.schemas import (
     EvidenceProvenance,
     CriterionEvaluation,
     DecisionOutcome,
+    DecisionReasonCode,
     DecisionResponse,
 )
 from decision.policy_evaluator import (
@@ -20,6 +21,18 @@ from decision.evidence_evaluator import (
     evaluate_all_evidence,
     evaluate_evidence_group,
 )
+
+
+def _collect_referenced_evidence_ids(
+    criteria_evaluations: Dict[str, CriterionEvaluation],
+) -> List[str]:
+    """Aggregate the real evidence IDs grounded in criterion provenance traces."""
+    ids: List[str] = []
+    for evaluation in criteria_evaluations.values():
+        for prov in evaluation.evidence_provenance:
+            if prov.evidence_id and prov.evidence_id not in ids:
+                ids.append(prov.evidence_id)
+    return ids
 
 
 def make_decision(
@@ -57,6 +70,7 @@ def make_decision(
                 criteria_evaluations={},
                 evidence_status={},
                 errors=["Payer is unknown or unvalidated."],
+                reason_code=DecisionReasonCode.UNKNOWN_PAYER,
             )
         # Note: payer present but member_id absent is NOT treated as unvalidated.
         # In real pipeline, runtime adapter attaches member_id from payer_data.db.
@@ -88,6 +102,7 @@ def make_decision(
                 criteria_evaluations={},
                 evidence_status={},
                 errors=validation_errors,
+                reason_code=DecisionReasonCode.POLICY_VALIDATION_ERROR,
             )
 
         # 2. Evaluate Clinical Exclusions on CaseData
@@ -312,6 +327,8 @@ def make_decision(
                 criteria_results=criteria_results,
                 criteria_evaluations=criteria_evaluations,
                 evidence_status=evidence_status,
+                reason_code=DecisionReasonCode.COVERAGE_EXCLUSION,
+                referenced_evidence_ids=_collect_referenced_evidence_ids(criteria_evaluations),
             )
 
         # Rule 2: Exclusion triggered but evidence is not reliable -> Escalate to HUMAN_REVIEW
@@ -325,6 +342,8 @@ def make_decision(
                 criteria_results=criteria_results,
                 criteria_evaluations=criteria_evaluations,
                 evidence_status=evidence_status,
+                reason_code=DecisionReasonCode.UNRELIABLE_EXCLUSION_EVIDENCE,
+                referenced_evidence_ids=_collect_referenced_evidence_ids(criteria_evaluations),
             )
 
         # Gather criteria states
@@ -364,6 +383,8 @@ def make_decision(
                 criteria_results=criteria_results,
                 criteria_evaluations=criteria_evaluations,
                 evidence_status=evidence_status,
+                reason_code=DecisionReasonCode.EVIDENCE_CONFLICT,
+                referenced_evidence_ids=_collect_referenced_evidence_ids(criteria_evaluations),
             )
 
         # Rule 4: Verified Mandatory Failure -> REJECT
@@ -380,6 +401,8 @@ def make_decision(
                 criteria_results=criteria_results,
                 criteria_evaluations=criteria_evaluations,
                 evidence_status=evidence_status,
+                reason_code=DecisionReasonCode.CRITERION_FAILED_HARD,
+                referenced_evidence_ids=_collect_referenced_evidence_ids(criteria_evaluations),
             )
 
         # Rule 5: Missing mandatory evidence -> REQUEST_MORE_INFORMATION
@@ -387,6 +410,16 @@ def make_decision(
             # Sort the missing keys to be predictable
             missing_keys = sorted(list({k for c in policy.criteria if c.mandatory for k in c.required_evidence_keys if k not in evidence_map}))
             reasoning.append(f"Decision Outcome: REQUEST_MORE_INFORMATION. Required evidence is missing: {', '.join(missing_keys)}")
+            # Policy-defined documentation requests for Agent2 recovery routing.
+            # Only keys actually absent from the submitted evidence are requested.
+            requested_information = sorted({
+                f"{criterion.name} ({criterion.criterion_id}): {key}"
+                for criterion in policy.criteria
+                if criterion.mandatory and criteria_evaluations.get(criterion.criterion_id)
+                and criteria_evaluations[criterion.criterion_id].state == "MISSING"
+                for key in criterion.required_evidence_keys
+                if key not in evidence_map
+            })
             return DecisionResponse(
                 case_id=case_data.case_id,
                 outcome=DecisionOutcome.REQUEST_MORE_INFORMATION,
@@ -395,6 +428,10 @@ def make_decision(
                 criteria_results=criteria_results,
                 criteria_evaluations=criteria_evaluations,
                 evidence_status=evidence_status,
+                reason_code=DecisionReasonCode.MISSING_DOCUMENTATION,
+                requested_information=requested_information,
+                referenced_evidence_ids=_collect_referenced_evidence_ids(criteria_evaluations),
+                agent2_recoverable=True,
             )
 
         # Rule 6: All mandatory criteria met, no exclusions triggered -> APPROVE
@@ -408,6 +445,8 @@ def make_decision(
                 criteria_results=criteria_results,
                 criteria_evaluations=criteria_evaluations,
                 evidence_status=evidence_status,
+                reason_code=DecisionReasonCode.ALL_CRITERIA_SATISFIED,
+                referenced_evidence_ids=_collect_referenced_evidence_ids(criteria_evaluations),
             )
 
         # Safety Fallback
@@ -420,6 +459,8 @@ def make_decision(
             criteria_results=criteria_results,
             criteria_evaluations=criteria_evaluations,
             evidence_status=evidence_status,
+            reason_code=DecisionReasonCode.ENGINE_FAIL_CLOSED,
+            referenced_evidence_ids=_collect_referenced_evidence_ids(criteria_evaluations),
         )
 
     except Exception as ex:
@@ -440,4 +481,5 @@ def make_decision(
             criteria_evaluations={},
             evidence_status={},
             errors=[err_msg],
+            reason_code=DecisionReasonCode.ENGINE_FAIL_CLOSED,
         )
