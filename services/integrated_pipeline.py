@@ -1,5 +1,7 @@
 import json
-from typing import Any, Dict, Optional
+from copy import deepcopy
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
 
 from models.rag_models import ClaimInput
 from adapters.rag_adapter import rag_claim_adapter, rag_policy_adapter
@@ -161,9 +163,32 @@ def run_integrated_pipeline(canonical_claim: Dict[str, Any], components: Dict[st
                     if req not in seen_docs:
                         seen_docs.add(req)
                         merged_output["documentation_requirements"].append(doc)
+
+            # Structured (dict) policy exclusions travel alongside the RAG output
+            # but are NOT part of the validated ClaimOutput contract (which stays
+            # exactly the 4 sanctioned root keys). Free-text chunk limitation /
+            # contraindication strings are intentionally not promoted into
+            # decision-level exclusions.
+            merged_exclusions = []
+            seen_exclusions = set()
+            for co in claim_outputs:
+                for exc in co.get("exclusions") or []:
+                    if not isinstance(exc, dict):
+                        continue
+                    exc_id = exc.get("exclusion_id")
+                    if exc_id and exc_id not in seen_exclusions:
+                        seen_exclusions.add(exc_id)
+                        merged_exclusions.append(exc)
                         
         # 4. RAG Output to legacy Agent 1 Policy dictionary format (rag_policy_adapter)
         rag_policy = rag_policy_adapter(merged_output, canonical_claim)
+
+        # Attach structured exclusions (kept outside the validated ClaimOutput
+        # contract) so hard coverage exclusions reach Agent 1 unchanged.
+        if not claim_outputs:
+            merged_exclusions = []
+        if merged_exclusions:
+            rag_policy["exclusions"] = merged_exclusions
         
         if not rag_policy.get("criteria"):
             # Safe fallback: no policy criteria matched or RAG failure occurred. Fail closed to HUMAN_REVIEW (Constraint 9 & 12)
@@ -261,3 +286,533 @@ def run_pipeline_from_db(
         )
 
     return run_integrated_pipeline(linked_claim, components)
+
+
+# =====================================================================
+# AGENT 2 V1 INTEGRATION LAYER
+# =====================================================================
+#
+# Real V1 workflow with recovery:
+#   Provider data -> CanonicalClaim -> RAG -> Agent 1 -> DecisionResponse
+#   -> routing -> Agent 2 (when appropriate) -> provider evidence recovery
+#   -> sensitivity/release gate -> SubmissionPackage -> Agent 1 again
+#   -> final outcome.
+#
+# Hard constraints honored here:
+#   * Agent 1 (run_integrated_pipeline / DecisionAgent) is never duplicated and
+#     its decision semantics are never altered; every version is re-decided by
+#     the same deterministic path including RAG.
+#   * Agent 2 recovery reads ONLY provider-side evidence (recovery_source);
+#     payer-side data never enters recovery. Payer linkage metrics already
+#     attached to the canonical claim are read by administrative gates only.
+#   * The NVIDIA LLM (agent2 RejectionAnalyzer) may only interpret search
+#     concepts; it never makes the coverage decision.
+#   * Claim versions are immutable append-only snapshots (V1 -> V2 -> ...).
+
+_ROUTE_RECOVERABLE = "RECOVERABLE"
+_ROUTE_TERMINAL = "TERMINAL"
+
+# Sensitivity taxonomy (DATA-VERSION1/README.md): only ROUTINE evidence may be
+# released programmatically. PROTECTED_* and UNKNOWN escalate to HUMAN_REVIEW.
+_SENSITIVITY_ROUTINE = "ROUTINE"
+_SENSITIVITY_PROTECTED_PREFIX = "PROTECTED_"
+
+_ADMIN_INACTIVE_COVERAGE_STATUSES = {"INACTIVE", "LAPSED", "TERMINATED", "EXPIRED"}
+
+# Provenance/meta fact keys that are never merged into derived clinical metrics.
+_FACT_META_KEYS = {
+    "evidence_type",
+    "source_record_id",
+    "event_date",
+    "provenance",
+    "sensitivity",
+    "content_reference",
+}
+
+
+def classify_decision_for_agent2(decision: DecisionResponse) -> str:
+    """Route an Agent 1 DecisionResponse for Agent 2 handling.
+
+    APPROVE/ACCEPT            -> terminal, no Agent 2 recovery.
+    HUMAN_REVIEW              -> terminal, no direct Agent 2 recovery.
+    REJECT with exclusion     -> hard terminal REJECT, no recovery.
+    REJECT without exclusion  -> recoverable (missing/failed evidence may exist).
+    REQUEST_MORE_INFORMATION  -> recoverable.
+    """
+    outcome = decision.outcome
+    if outcome == DecisionOutcome.APPROVE or outcome == DecisionOutcome.HUMAN_REVIEW:
+        return _ROUTE_TERMINAL
+    if outcome == DecisionOutcome.REJECT:
+        if any(decision.exclusion_results.values()):
+            # Hard coverage exclusion: terminal by definition.
+            return _ROUTE_TERMINAL
+        return _ROUTE_RECOVERABLE
+    if outcome == DecisionOutcome.REQUEST_MORE_INFORMATION:
+        return _ROUTE_RECOVERABLE
+    return _ROUTE_TERMINAL
+
+
+def _administrative_block_reason(claim: Dict[str, Any]) -> Optional[str]:
+    """Administrative gates that force a terminal REJECT with no Agent 2.
+
+    Lapsed eligibility and exceeded filing deadlines are deterministic
+    administrative facts (not uncertainty), so they resolve to a terminal
+    administrative denial rather than HUMAN_REVIEW.
+
+    Uses only payer-linkage metrics already attached to the canonical claim
+    (orchestration-level gate; Agent 2 itself never queries payer data).
+    """
+    metrics = (claim.get("case_data") or {}).get("clinical_metrics") or {}
+    if metrics.get("eligibility_eligible") is False:
+        return "Lapsed eligibility: member is not eligible; terminal administrative denial."
+    coverage_status = metrics.get("coverage_status")
+    if isinstance(coverage_status, str) and coverage_status.strip().upper() in _ADMIN_INACTIVE_COVERAGE_STATUSES:
+        return (
+            f"Lapsed eligibility: coverage status '{coverage_status}'; "
+            "terminal administrative denial."
+        )
+    if metrics.get("filing_deadline_exceeded") is True or metrics.get("filing_deadline_status") == "EXCEEDED":
+        return "Filing deadline exceeded: resubmission window closed; terminal administrative denial."
+    return None
+
+
+def _requested_evidence_keys(decision: DecisionResponse) -> List[str]:
+    """Evidence keys Agent 1 reported as missing or tied to failed criteria."""
+    keys = {k for k, status in (decision.evidence_status or {}).items() if status == "missing"}
+    for crit_id, evaluation in (decision.criteria_evaluations or {}).items():
+        if evaluation.state in ("FAIL", "MISSING", "CONFLICTING"):
+            for prov in evaluation.evidence_provenance:
+                if prov.evaluation_status == "missing" and prov.evidence_key:
+                    keys.add(prov.evidence_key)
+    ordered: List[str] = []
+    for key in sorted(keys):
+        if not key.startswith("__"):
+            ordered.append(key)
+    return ordered
+
+
+def _failed_criterion_ids(decision: DecisionResponse) -> List[str]:
+    return sorted(
+        crit_id
+        for crit_id, evaluation in (decision.criteria_evaluations or {}).items()
+        if evaluation.state in ("FAIL", "MISSING", "CONFLICTING")
+    )
+
+
+def _decision_to_payer_response(decision: DecisionResponse) -> Any:
+    """Convert a DecisionResponse into the agent2 PayerResponse contract."""
+    from agent2.schemas.payer_response import PayerResponse
+
+    outcome_map = {
+        DecisionOutcome.APPROVE: "APPROVED",
+        DecisionOutcome.REJECT: "REJECTED",
+        DecisionOutcome.REQUEST_MORE_INFORMATION: "REQUEST_MORE_INFORMATION",
+        DecisionOutcome.HUMAN_REVIEW: "HUMAN_REVIEW",
+    }
+    decision_value = outcome_map.get(decision.outcome, "HUMAN_REVIEW")
+
+    missing_keys = _requested_evidence_keys(decision)
+    requested_information = [f"Required evidence is missing: {key}" for key in missing_keys]
+    for evaluation in (decision.criteria_evaluations or {}).values():
+        for line in evaluation.reasoning:
+            if line.startswith("Required evidence is missing:"):
+                if line not in requested_information:
+                    requested_information.append(line)
+
+    reason_lines = [
+        line for line in decision.reasoning
+        if "Decision Outcome:" in line or "Required evidence is missing" in line
+    ]
+    reason = "; ".join(reason_lines) if reason_lines else str(decision.outcome)
+
+    is_recoverable = True
+    if decision.outcome == DecisionOutcome.REJECT and any(decision.exclusion_results.values()):
+        is_recoverable = False
+
+    return PayerResponse(
+        submission_id=decision.claim_id or decision.case_id,
+        decision=decision_value,
+        reason=reason,
+        is_recoverable=is_recoverable,
+        failed_criteria=_failed_criterion_ids(decision),
+        requested_information=requested_information,
+    )
+
+
+def _classify_sensitivity(item: Dict[str, Any]) -> str:
+    """Classify one evidence item: ROUTINE (releasable), PROTECTED, or UNKNOWN."""
+    facts = item.get("extracted_facts") or {}
+    raw = facts.get("sensitivity") if isinstance(facts, dict) else None
+    if raw is None or not str(raw).strip():
+        return "UNKNOWN"
+    value = str(raw).strip().upper()
+    if value == _SENSITIVITY_ROUTINE:
+        return "ROUTINE"
+    if value.startswith(_SENSITIVITY_PROTECTED_PREFIX):
+        return "PROTECTED"
+    return "UNKNOWN"
+
+
+def _release_gate(items: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Programmatic sensitivity/release gate.
+
+    Returns (released_items, blocked_items). Only ROUTINE evidence is released;
+    PROTECTED_* and UNKNOWN evidence are blocked and must go to HUMAN_REVIEW.
+    """
+    released: List[Dict[str, Any]] = []
+    blocked: List[Dict[str, Any]] = []
+    for item in items:
+        if _classify_sensitivity(item) == "ROUTINE":
+            released.append(item)
+        else:
+            blocked.append(item)
+    return released, blocked
+
+
+def _concept_matches_item(concept: str, item: Dict[str, Any]) -> bool:
+    concept = concept.strip().lower()
+    if not concept:
+        return False
+    haystacks = [
+        str(item.get("evidence_key") or ""),
+        str((item.get("extracted_facts") or {}).get("evidence_type") or ""),
+        str(item.get("unstructured_text") or ""),
+    ]
+    facts = item.get("extracted_facts") or {}
+    if isinstance(facts, dict):
+        haystacks.append(json.dumps(facts, default=str))
+    return any(concept in haystack.lower() for haystack in haystacks)
+
+
+def _select_recovered_evidence(
+    pool: List[Dict[str, Any]],
+    requested_keys: List[str],
+    concepts: List[str],
+    existing_ids: set,
+) -> List[Dict[str, Any]]:
+    """Minimum-necessary selection of real provider records for recovery.
+
+    Only pool items (real evidence rows) can ever be returned, so no evidence
+    can be fabricated. Matching is restricted to items whose evidence_key was
+    explicitly requested by Agent 1 or whose content matches a requested
+    clinical concept; everything else is left out (minimum necessary).
+    """
+    selected: List[Dict[str, Any]] = []
+    seen_ids = set()
+    normalized_keys = {str(k).lower() for k in requested_keys}
+    for item in pool or []:
+        evidence_id = item.get("evidence_id")
+        if not evidence_id or evidence_id in existing_ids or evidence_id in seen_ids:
+            continue
+        key_match = str(item.get("evidence_key") or "").lower() in normalized_keys
+        concept_match = any(_concept_matches_item(c, item) for c in concepts)
+        if key_match or concept_match:
+            selected.append(item)
+            seen_ids.add(evidence_id)
+    return selected
+
+
+def _build_next_version_claim(
+    base_claim: Dict[str, Any],
+    recovered_items: List[Dict[str, Any]],
+) -> Tuple[Dict[str, Any], List[str]]:
+    """Build the next immutable claim version by appending recovered evidence.
+
+    History is never overwritten: the base version stays untouched and the new
+    version is a deep copy plus append-only evidence delta. Derived case_data
+    fields (diagnoses, clinical_metrics) are rebuilt for the new evidence set;
+    recovered (new_evidence_delta) facts take precedence over previously
+    derived metric values because the delta is the corrective content of the
+    resubmission, while every original evidence item remains in place.
+    """
+    claim = deepcopy(base_claim)
+    evidence = claim.setdefault("evidence", [])
+    existing_ids = {item.get("evidence_id") for item in evidence if isinstance(item, dict)}
+
+    delta_ids: List[str] = []
+    for item in recovered_items:
+        evidence_id = item.get("evidence_id")
+        if not evidence_id or evidence_id in existing_ids:
+            continue
+        evidence.append(deepcopy(item))
+        existing_ids.add(evidence_id)
+        delta_ids.append(evidence_id)
+
+    submission = claim.setdefault("submission", {})
+    try:
+        submission["attempt"] = int(submission.get("attempt") or 1) + 1
+    except (TypeError, ValueError):
+        submission["attempt"] = 2
+    submission["new_evidence_delta"] = delta_ids
+
+    case_data = claim.setdefault("case_data", {})
+
+    # Rebuild claim-relevant diagnoses from the full V-next evidence set
+    # (same derivation rule as RuntimeAdapter: ICD codes in content references).
+    diagnoses: List[str] = list(case_data.get("diagnoses") or [])
+    for item in evidence:
+        content = ((item.get("extracted_facts") or {}).get("content_reference")) if isinstance(item, dict) else None
+        for code in RuntimeAdapter._extract_diagnosis_codes(content):
+            if code not in diagnoses:
+                diagnoses.append(code)
+    case_data["diagnoses"] = diagnoses
+
+    # Merge recovered facts into derived clinical metrics with delta precedence.
+    metrics = dict(case_data.get("clinical_metrics") or {})
+    for item in recovered_items:
+        facts = item.get("extracted_facts") or {}
+        if not isinstance(facts, dict):
+            continue
+        for key, value in facts.items():
+            if key in _FACT_META_KEYS:
+                continue
+            metrics[key] = value
+    case_data["clinical_metrics"] = metrics
+
+    return claim, delta_ids
+
+
+@dataclass
+class Agent2V1Result:
+    """Outcome of the Agent1 + Agent2 real V1 pipeline run."""
+
+    final_outcome: DecisionOutcome
+    final_decision: DecisionResponse
+    versions: List[Dict[str, Any]] = field(default_factory=list)          # immutable snapshots V1..Vn
+    submissions: List[Dict[str, Any]] = field(default_factory=list)        # SubmissionPackages for V2+
+    agent2_invoked: bool = False
+    resubmissions: int = 0
+    human_review_required: bool = False
+    human_review_reasons: List[str] = field(default_factory=list)
+    sensitive_blocked: bool = False
+    audit_trail: List[str] = field(default_factory=list)
+
+
+def _default_recovery_source_factory(adapter: Optional[RuntimeAdapter] = None):
+    """Recovery source backed by the provider DB only (never payer data)."""
+    rt = adapter or RuntimeAdapter()
+
+    def source(requested_keys: List[str], concepts: List[str], claim: Dict[str, Any]) -> List[Dict[str, Any]]:
+        metrics = (claim.get("case_data") or {}).get("clinical_metrics") or {}
+        patient_id = claim.get("patient_id") or metrics.get("patient_id") or metrics.get("member_id")
+        return rt.get_provider_evidence_pool(patient_id)
+
+    return source
+
+
+def run_agent2_v1_pipeline(
+    canonical_claim: Dict[str, Any],
+    components: Dict[str, Any],
+    recovery_source=None,
+    max_resubmissions: Optional[int] = None,
+) -> Agent2V1Result:
+    """Run the real V1 pipeline with Agent 2 evidence recovery integrated.
+
+    Flow: CanonicalClaim -> RAG -> Agent 1 -> DecisionResponse -> routing ->
+    Agent 2 recovery (provider-side only) -> release gate -> SubmissionPackage
+    -> Agent 1 again -> final outcome.
+
+    ``recovery_source(requested_keys, concepts, claim) -> [evidence items]``
+    supplies the provider-side evidence pool; defaults to the provider DB via
+    RuntimeAdapter.get_provider_evidence_pool. Claim versions are immutable
+    (V1 -> V2 -> ...) and the loop is bounded by MAX_RESUBMISSION_ATTEMPTS so
+    Agent 1 <-> Agent 2 can never loop forever.
+    """
+    from agent2.config import MAX_RESUBMISSION_ATTEMPTS
+    from agent2.reasoning.rejection_analyzer import RejectionAnalyzer
+
+    if recovery_source is None:
+        recovery_source = _default_recovery_source_factory()
+    cap = max_resubmissions if max_resubmissions is not None else MAX_RESUBMISSION_ATTEMPTS
+
+    audit: List[str] = []
+    versions: List[Dict[str, Any]] = []
+    submissions: List[Dict[str, Any]] = []
+    human_review_reasons: List[str] = []
+    sensitive_blocked = False
+    agent2_invoked = False
+    resubmissions = 0
+
+    analyzer = RejectionAnalyzer()
+
+    current_claim = deepcopy(canonical_claim)
+    decision = run_integrated_pipeline(current_claim, components)
+    versions.append({
+        "version": "V1",
+        "attempt": (current_claim.get("submission") or {}).get("attempt") or 1,
+        "claim": current_claim,
+        "decision": decision,
+        "new_evidence_delta": [],
+    })
+    audit.append(f"V1: Agent1 outcome={decision.outcome.value}")
+
+    final_outcome_override: Optional[DecisionOutcome] = None
+
+    while True:
+        route = classify_decision_for_agent2(decision)
+        if route != _ROUTE_RECOVERABLE:
+            if decision.outcome == DecisionOutcome.APPROVE:
+                audit.append("Routing: APPROVE is terminal; Agent2 not invoked.")
+            elif decision.outcome == DecisionOutcome.HUMAN_REVIEW:
+                audit.append("Routing: HUMAN_REVIEW is terminal; no direct Agent2 recovery.")
+                human_review_reasons.append("Agent1 escalated to HUMAN_REVIEW; no direct Agent2 recovery.")
+            else:
+                audit.append("Routing: hard terminal REJECT (exclusion); no Agent2 recovery.")
+            break
+
+        admin_reason = _administrative_block_reason(current_claim)
+        if admin_reason:
+            audit.append(
+                f"Routing: terminal administrative REJECT ({admin_reason}); Agent2 not invoked."
+            )
+            final_outcome_override = DecisionOutcome.REJECT
+            break
+
+        agent2_invoked = True
+
+        if resubmissions >= cap:
+            reason = (
+                f"MAX_RESUBMISSION_ATTEMPTS reached ({cap}); stopping safely without overwriting history."
+            )
+            audit.append(reason)
+            human_review_reasons.append(reason)
+            final_outcome_override = DecisionOutcome.HUMAN_REVIEW
+            break
+
+        payer_response = _decision_to_payer_response(decision)
+        analysis = analyzer.analyze_payer_response(payer_response)
+        concepts = list(analysis.get("requested_concepts") or [])
+        requested_keys = _requested_evidence_keys(decision)
+        audit.append(
+            f"Agent2 analysis: failed_criteria={analysis.get('failed_criterion_ids')}, "
+            f"requested_concepts={concepts}, requested_keys={requested_keys}"
+        )
+
+        pool = recovery_source(requested_keys, concepts, current_claim) or []
+        existing_ids = {
+            item.get("evidence_id") for item in current_claim.get("evidence", []) if isinstance(item, dict)
+        }
+        candidates = _select_recovered_evidence(pool, requested_keys, concepts, existing_ids)
+        audit.append(f"Agent2 recovery: pool_size={len(pool)}, candidates={[c.get('evidence_id') for c in candidates]}")
+
+        if not candidates:
+            reason = "No recoverable provider-side evidence found; nothing was fabricated. Escalating to HUMAN_REVIEW."
+            audit.append(reason)
+            human_review_reasons.append(reason)
+            final_outcome_override = DecisionOutcome.HUMAN_REVIEW
+            break
+
+        released, blocked = _release_gate(candidates)
+        if blocked:
+            sensitive_blocked = True
+            blocked_ids = [item.get("evidence_id") for item in blocked]
+            reason = (
+                f"Programmatic release gate blocked sensitive/restricted evidence {blocked_ids}; "
+                "escalating to HUMAN_REVIEW."
+            )
+            audit.append(reason)
+            human_review_reasons.append(reason)
+            final_outcome_override = DecisionOutcome.HUMAN_REVIEW
+            break
+
+        # Anti-fabrication guard: only records physically present in the
+        # provider pool may enter the resubmission.
+        pool_ids = {item.get("evidence_id") for item in pool}
+        if any(item.get("evidence_id") not in pool_ids for item in released):
+            reason = "Recovered evidence failed provenance validation against the provider pool."
+            audit.append(reason)
+            human_review_reasons.append(reason)
+            final_outcome_override = DecisionOutcome.HUMAN_REVIEW
+            break
+
+        next_claim, delta_ids = _build_next_version_claim(current_claim, released)
+        resubmissions += 1
+        version_label = f"V{len(versions) + 1}"
+        attempt_no = (next_claim.get("submission") or {}).get("attempt") or (resubmissions + 1)
+
+        submission_package = {
+            "version": version_label,
+            "claim_id": next_claim.get("claim_id"),
+            "attempt": attempt_no,
+            "evidence_ids": [
+                item.get("evidence_id") for item in next_claim.get("evidence", []) if isinstance(item, dict)
+            ],
+            "new_evidence_delta": delta_ids,
+            "released": True,
+        }
+        submissions.append(submission_package)
+        audit.append(
+            f"{version_label}: SubmissionPackage prepared with delta={delta_ids} (provenance preserved)."
+        )
+
+        # Re-run the SAME Agent 1 pipeline (RAG included) on the new version.
+        decision = run_integrated_pipeline(next_claim, components)
+        versions.append({
+            "version": version_label,
+            "attempt": attempt_no,
+            "claim": next_claim,
+            "decision": decision,
+            "new_evidence_delta": delta_ids,
+        })
+        audit.append(f"{version_label}: Agent1 outcome={decision.outcome.value}")
+        current_claim = next_claim
+
+    final_outcome = final_outcome_override or decision.outcome
+    human_review_required = final_outcome == DecisionOutcome.HUMAN_REVIEW
+    return Agent2V1Result(
+        final_outcome=final_outcome,
+        final_decision=decision,
+        versions=versions,
+        submissions=submissions,
+        agent2_invoked=agent2_invoked,
+        resubmissions=resubmissions,
+        human_review_required=human_review_required,
+        human_review_reasons=human_review_reasons,
+        sensitive_blocked=sensitive_blocked,
+        audit_trail=audit,
+    )
+
+
+def run_agent2_pipeline_from_db(
+    patient_id: str,
+    components: Dict[str, Any],
+    claim_id: Optional[str] = None,
+    attempt: Optional[int] = None,
+    adapter: Optional[RuntimeAdapter] = None,
+    max_resubmissions: Optional[int] = None,
+) -> Agent2V1Result:
+    """End-to-end entry with Agent 2: provider DB -> linked runtime claim ->
+    run_agent2_v1_pipeline, with recovery sourced from the provider DB only."""
+    rt = adapter or RuntimeAdapter()
+    linked_claim = rt.get_linked_runtime_claim(patient_id, claim_id, attempt)
+
+    if linked_claim is None:
+        fallback = DecisionResponse(
+            case_id=claim_id or patient_id or "UNKNOWN-CLAIM",
+            outcome=DecisionOutcome.HUMAN_REVIEW,
+            reasoning=[
+                "Runtime adapter could not resolve provider claim and payer context.",
+                f"patient_id={patient_id}, claim_id={claim_id}, attempt={attempt}.",
+            ],
+            exclusion_results={},
+            criteria_results={},
+            criteria_evaluations={},
+            evidence_status={},
+            errors=["Provider claim or payer context not found in V1 databases."],
+            claim_id=claim_id,
+        )
+        return Agent2V1Result(
+            final_outcome=DecisionOutcome.HUMAN_REVIEW,
+            final_decision=fallback,
+            human_review_required=True,
+            human_review_reasons=["Provider claim or payer context not found in V1 databases."],
+            audit_trail=["Agent2 pipeline aborted: linked runtime claim unavailable."],
+        )
+
+    linked_claim["patient_id"] = patient_id
+    return run_agent2_v1_pipeline(
+        linked_claim,
+        components,
+        recovery_source=_default_recovery_source_factory(rt),
+        max_resubmissions=max_resubmissions,
+    )

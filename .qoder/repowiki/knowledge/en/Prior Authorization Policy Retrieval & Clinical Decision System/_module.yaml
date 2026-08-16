@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: ""
+title: Prior Authorization Policy Retrieval & Clinical Decision System
+scope:
+    - README.md
+    - requirements.txt
+    - .gitignore
+    - .env.example
+    - AGENT2_INSPECTION_REPORT.md
+source_files: []
+depends_on: []
+related_to: []

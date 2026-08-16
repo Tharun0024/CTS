@@ -227,11 +227,28 @@ class PriorAuthOrchestrator:
             state = "BUILDING_PACKAGE"
             
             try:
-                submission_pkg = self.package_builder.build_package(
+                submission_pkg, has_sensitive_evidence, sensitive_blocked = self.package_builder.build_package(
                     claim=canonical_claim,
                     evaluations=criterion_evals,
                     candidate_evidence=filtered_candidates
                 )
+                if has_sensitive_evidence:
+                    logger.log_transition(claim_id, version, state, "HUMAN_REVIEW", "Sensitive/restricted evidence blocked by programmatic release gate.")
+                    state = "HUMAN_REVIEW"
+                    self.claim_repo.update_claim_status(claim_id, "HUMAN_REVIEW")
+                    self.claim_repo.create_human_review(
+                        review_id=f"REV-{uuid.uuid4().hex[:8].upper()}",
+                        claim_id=claim_id,
+                        reason=f"Sensitive evidence blocked by release gate: {', '.join(sensitive_blocked)}",
+                        failed_criteria=[],
+                        missing_information=[],
+                        uncertain_information=[],
+                        recommended_action="Manual medical director review required per sensitive evidence block."
+                    )
+                    completed = True
+                    human_review_required = True
+                    missing_info_list = [f"Sensitive evidence blocked: {', '.join(sensitive_blocked)}"]
+                    break
             except Exception as e:
                 logger.log_transition(claim_id, version, state, "FAILED", "Construct package", result="Error", error=str(e))
                 return Agent2Result(

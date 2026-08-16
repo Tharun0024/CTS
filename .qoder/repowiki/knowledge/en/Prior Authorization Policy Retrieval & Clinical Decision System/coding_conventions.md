@@ -1,0 +1,6 @@
+- All cross-component data exchange goes through Pydantic models in `models/rag_models.py` and `transformation/canonical_claim.py` (CanonicalClaim, ClaimInput, ClaimOutput) rather than raw dicts.
+- External secrets (NVIDIA_API_KEY, OPENROUTER_API_KEY, LLM_API_KEY) are loaded exclusively from environment variables via python-dotenv and never hard-coded.
+- RAG retrieval follows a fixed three-stage pattern — exact lookup → BM25 keyword → FAISS semantic — followed by BGEReranker scoring and a single-policy consistency aggregation step before any LLM call.
+- LLM usage is restricted to structured JSON formatting of already-grounded Evidence Objects; policy selection, clinical eligibility, and exclusion evaluation remain deterministic and outside the LLM scope.
+- Each functional area (`rag/*`, `decision/*`, `services/*`) is implemented as a self-contained package with its own submodules (e.g., chunking, embeddings, reranking, evidence, llm) and exposed through a single top-level entry point.
+- Verification and performance are captured via dedicated `scripts.*` modules (build_index, evaluate, benchmark, query_pipeline) that can be invoked as standalone Python modules.

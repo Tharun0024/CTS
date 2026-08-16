@@ -1,0 +1,1 @@
+Pydantic v2 for cross-stage schema contracts; BM25 and FAISS for dual-path retrieval feeding a shared candidate pool; BGE embedding/reranker models consumed by the embeddings and reranking stages.

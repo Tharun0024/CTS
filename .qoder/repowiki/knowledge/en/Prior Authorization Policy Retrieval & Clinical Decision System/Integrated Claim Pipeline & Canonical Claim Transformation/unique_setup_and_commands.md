@@ -1,0 +1,1 @@
+No build script; the module is consumed as a library. End-to-end runs are triggered via `run_pipeline_from_db(patient_id, components)` or `run_agent2_pipeline_from_db(patient_id, components, claim_id, attempt)`, which require a `RuntimeAdapter` implementation wired into `components` and access to provider/payer databases.

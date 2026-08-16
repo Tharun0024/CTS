@@ -1,0 +1,1 @@
+Python dataclasses and typed dicts; relies on Pydantic-style `ClaimInput` models, FAISS/BGE embeddings, BM25 retrieval, and an external LLM client; uses `copy.deepcopy` to enforce immutable claim versions across resubmissions.

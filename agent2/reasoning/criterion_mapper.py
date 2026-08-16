@@ -14,7 +14,7 @@ try:
     from agent2.config import NVIDIA_API_KEY, NVIDIA_BASE_URL, NVIDIA_MODEL, GEMINI_API_KEY
 except ImportError:
     NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
-    NVIDIA_BASE_URL = os.getenv("NVIDIA_API_URL", "https://integrate.api.nvidia.com/v1")
+    NVIDIA_BASE_URL = os.getenv("NVIDIA_BASE_URL") or os.getenv("NVIDIA_API_URL") or "https://integrate.api.nvidia.com/v1"
     NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "meta/llama-3.1-8b-instruct")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 

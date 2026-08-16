@@ -1,0 +1,6 @@
+- All inputs and outputs are validated through Pydantic models defined in `schemas.py`, with `model_config = {'extra': 'forbid'}` used on strict contracts like `CanonicalClaim` and `LLMCriterionAssessmentResponse`.
+- Fail-closed behavior is enforced everywhere: invalid rules, malformed LLM responses, unknown payers, and unexpected exceptions all return a `DecisionResponse` with `outcome=HUMAN_REVIEW` rather than raising.
+- LLM integration is abstracted behind the `LLMProvider` ABC with multiple concrete implementations (NVIDIA/OpenRouter/Gemini/Mock), each exposing `generate_structured_response(prompt, system_prompt)` returning raw JSON text.
+- Prompt construction is centralized in `llm_prompt.py` via separate system prompts and dedicated `build_*_prompt` functions per contract (fact extraction, criterion assessment, optimized classifier).
+- Evidence status aggregation uses a fixed `STATUS_SEVERITY` dictionary to resolve conflicting per-item statuses into a single worst-case status per evidence key.
+- Rule evaluation follows a uniform pattern: `validate_rule` guards structure, `resolve_field_value` traverses dot-separated paths safely, and `check_operator` handles type-safe comparisons across eq/ne/lt/gt/contains/in operators.

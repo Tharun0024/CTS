@@ -1,0 +1,1 @@
+SQLite database paths default to `<repo>/DATA-VERSION1/big_patient_data.db` and `.../payer_data.db`; if these files are missing the adapter methods return `None`/`[]` rather than raising, allowing unit tests to run without real data.

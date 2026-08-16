@@ -1,0 +1,1 @@
+Python with Pydantic v2 models for schema validation; SQLite for the provider-side clinical warehouse; NVIDIA LLM API (default `meta/llama-3.1-8b-instruct`) with Gemini fallback for criterion mapping; `.env`-driven configuration via `python-dotenv`.

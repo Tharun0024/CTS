@@ -1,0 +1,1 @@
+Static data assets for the PA claim ingestion and simulation pipeline, including raw clinical/payer datasets, preprocessed claims, policy RAG corpus with FAISS vector store, and scenario PDFs.

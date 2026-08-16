@@ -1,0 +1,1 @@
+Seed the database with Synthea FHIR records via `python -m database.importer`, then run scenario test profiles with `python -m tests.setup_test_data`, and execute the full E2E suite with `python -m tests.test_end_to_end`. Requires a `.env` file at the project root containing `GEMINI_API_KEY` or `NVIDIA_API_KEY`/`NVIDIA_BASE_URL`/`NVIDIA_MODEL`.

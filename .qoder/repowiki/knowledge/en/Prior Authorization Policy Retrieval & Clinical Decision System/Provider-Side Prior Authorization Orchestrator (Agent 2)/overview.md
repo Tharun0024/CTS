@@ -1,0 +1,1 @@
+Provider-side orchestrator that ingests claims, retrieves and ranks clinical evidence against normalized payer policies, builds minimum-necessary submission packages, and manages closed-loop resubmissions via a payer engine.

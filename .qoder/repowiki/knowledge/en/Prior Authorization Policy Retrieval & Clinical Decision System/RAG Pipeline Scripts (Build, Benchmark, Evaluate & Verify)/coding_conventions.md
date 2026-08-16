@@ -1,0 +1,6 @@
+- Each script follows a flat `main()` function pattern with a `if __name__ == '__main__': main()` guard and no shared base class or framework.
+- Configuration is always loaded from `config/config.yaml` via `yaml.safe_load` and accessed through the `paths.*` keys rather than hard-coded filesystem locations.
+- Pipeline components are instantiated once up front (ExactMatcher, BGEEmbedder, FAISSRetriever, BM25Retriever, CandidatePool, BGEReranker, PolicyAggregator, DeterministicAnalyzer, EvidenceBuilder, LLMClient, PromptBuilder, OutputValidator) and reused across multiple runs inside a loop.
+- Latency and metrics are collected as per-stage millisecond timings accumulated in lists and summarized with numpy percentiles (p50/p90/p95/p99) plus mean/min/max.
+- Every script writes both a machine-readable JSON report and a human-readable Markdown report under a `reports/` directory created with `os.makedirs('reports', exist_ok=True)`.
+- End-to-end verification scripts construct canonical claims via `RuntimeAdapter.get_linked_runtime_claim` and then invoke `services.integrated_pipeline.run_integrated_pipeline` with a shared `components` dict, keeping scenario definitions separate from infrastructure setup.

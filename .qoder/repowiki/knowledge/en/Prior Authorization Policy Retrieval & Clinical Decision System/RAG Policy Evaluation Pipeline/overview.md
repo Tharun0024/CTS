@@ -1,0 +1,1 @@
+Orchestrates a claim-driven retrieval-augmented generation pipeline that ingests policies, chunks and embeds them, retrieves matching criteria via BM25/FAISS reranking, and adapts results into the Agent-1 policy contract.

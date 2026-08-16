@@ -1,0 +1,3 @@
+- Each verification dimension is emitted as a paired JSON + Markdown file sharing the same base name (e.g. `dataset_profile`, `evaluation_report`, `benchmark_report`, `data_quality_report`).
+- The final run log uses a fixed sectioned layout with `SECTION N:` headers followed by `[PASS]` / `[FAIL]` line items, culminating in a `FINAL VERIFICATION SUMMARY` table comparing expected vs actual decisions per scenario.
+- Per-scenario entries consistently record Decision, Policy, RAG LLM status, Criteria, Assessments, Latency, Errors, and Expected outcome for traceability.

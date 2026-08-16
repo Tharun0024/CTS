@@ -257,6 +257,49 @@ class RuntimeAdapter:
             "evidence": evidence_list,
         }
 
+    def get_provider_evidence_pool(self, patient_id: Optional[str]) -> List[Dict[str, Any]]:
+        """Full provider-side evidence pool for one patient (Agent 2 recovery source).
+
+        Reads ONLY the provider database (big_patient_data.db). Agent 2 recovery
+        must never touch payer-side data; the payer database is intentionally not
+        accessed here. Items use the same canonical evidence shape as
+        get_provider_canonical_claim so recovered records can be appended to a
+        resubmission claim without transformation.
+        """
+        if not patient_id:
+            return []
+
+        rows = self._fetch_all(
+            self.provider_db,
+            "SELECT evidence_id, patient_id, source_type, source_record_id, document_id, evidence_type, event_date, content_reference, provenance, sensitivity FROM evidence WHERE patient_id = ? ORDER BY evidence_id",
+            (patient_id,),
+        )
+
+        pool: List[Dict[str, Any]] = []
+        for row in rows:
+            evidence_id = row["evidence_id"]
+            evidence_type = row["evidence_type"]
+            pool.append(
+                {
+                    "evidence_key": self.map_evidence_key(evidence_type, evidence_id),
+                    "evidence_id": evidence_id,
+                    "source": row["source_type"],
+                    "status": "verified" if (row["sensitivity"] or "ROUTINE") == "ROUTINE" else "unverified",
+                    "confidence_score": 0.96,
+                    "is_ambiguous": False,
+                    "extracted_facts": {
+                        "evidence_type": evidence_type,
+                        "source_record_id": row["source_record_id"],
+                        "event_date": row["event_date"],
+                        "provenance": row["provenance"],
+                        "sensitivity": row["sensitivity"],
+                        "content_reference": row["content_reference"],
+                    },
+                    "unstructured_text": row["content_reference"],
+                }
+            )
+        return pool
+
     def attach_payer_context(
         self,
         provider_claim: Dict[str, Any],

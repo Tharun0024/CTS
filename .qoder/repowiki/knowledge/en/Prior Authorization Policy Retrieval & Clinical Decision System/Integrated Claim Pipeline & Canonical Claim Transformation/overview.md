@@ -1,0 +1,1 @@
+Orchestrates the end-to-end claim adjudication pipeline from canonical claims through RAG retrieval, policy aggregation, and Agent 1/Agent 2 decision loops with evidence recovery.

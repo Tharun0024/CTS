@@ -14,7 +14,7 @@ dist/
 
 # RAG local caches and model artifacts
 .cache/
-embeddings/
+/data/embeddings/
 vector_store/
 cache/
 checkpoints/

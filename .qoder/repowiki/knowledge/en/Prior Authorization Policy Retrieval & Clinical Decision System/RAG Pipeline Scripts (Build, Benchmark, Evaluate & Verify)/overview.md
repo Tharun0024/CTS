@@ -1,0 +1,1 @@
+Standalone Python scripts that build the RAG index, benchmark latency, evaluate retrieval accuracy, inspect datasets, and run end-to-end verification of the prior-authorization policy retrieval pipeline.

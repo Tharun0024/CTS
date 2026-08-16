@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: agent2_orchestrator
+title: Provider-Side Prior Authorization Orchestrator (Agent 2)
+scope:
+    - agent2/
+source_files: []
+depends_on: []
+related_to: []

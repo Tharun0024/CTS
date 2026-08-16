@@ -1,0 +1,1 @@
+pytest for unit/integration tests; FastAPI `TestClient` for API endpoint testing; OpenRouter LLM provider for live smoke tests and Phase 4 benchmarks; FAISS/BM25 retrievers and BGE embeddings exercised by RAG component tests.

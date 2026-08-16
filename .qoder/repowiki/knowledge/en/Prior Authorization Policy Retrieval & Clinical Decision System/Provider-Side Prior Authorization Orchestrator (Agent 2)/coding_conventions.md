@@ -1,0 +1,6 @@
+- Each workflow stage logs a state transition via `AuditLogger.log_transition(claim_id, version, from_state, to_state, message)` before mutating state, producing an auditable timeline of claim processing.
+- Failure paths return a fully populated `Agent2Result` with explicit status fields (`status`, `validation_status`, `evidence_status`, `policy_status`, `missing_information`) rather than raising exceptions, allowing callers to inspect granular outcomes.
+- Domain logic is decomposed into single-responsibility service classes injected into the orchestrator constructor (e.g., `ClaimValidator`, `EvidenceRanker`, `CriterionMapper`, `RejectionAnalyzer`, `PackageBuilder`, `VersionManager`, `Agent1Client`), enabling test-time replacement with mocks.
+- Configuration is centralized in `config.py` loaded via `dotenv`, with environment variables providing API keys and base URLs while default values keep the system runnable without credentials.
+- Persistent entities are modeled as Pydantic schemas in `schemas/` and persisted through dedicated repository classes under `database/repositories/`, keeping SQL queries out of business logic.
+- Scenario-mode simulation (withholding specific evidence types in V1) is implemented as conditional branches inside the retrieval loop keyed by `scenario_mode` and `version`, isolating test harness behavior from production flow.
