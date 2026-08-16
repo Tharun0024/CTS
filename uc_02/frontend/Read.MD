@@ -290,6 +290,87 @@ Returns the created `ClaimDetails` object containing initial state details, and 
 
 ---
 
+### 2.3 Insurer Data (Administrative)
+* **Location:** `/insurance/members` (Member Directory details) & `/insurance/claims/:id` (Insurer Data panel)
+* **Purpose:** Retrieves administrative information (Member Eligibility, Prior Auth History, Claim History, Utilization/Frequency, and Coverage Details) for a specific patient.
+* **HTTP Method:** `GET`
+* **Endpoint:** `/api/insurance/patients/{patient_id}/administrative`
+* **Content-Type:** `application/json`
+
+#### Outgoing Response Payload Structure
+```json
+{
+  "patient_id": "PAT-001",
+  "patient_name": "John Mitchell",
+  "eligibility": {
+    "eligible": true,
+    "coverage_status": "Active" | "Inactive" | "Suspended" | "Terminated",
+    "effective_date": "2024-01-01",
+    "termination_date": "2026-07-01",
+    "copay_amount": 30,
+    "deductible_met": 1250,
+    "deductible_total": 2000
+  },
+  "prior_auth_history": [
+    {
+      "auth_id": "AUTH-001",
+      "procedure": "Total Knee Replacement",
+      "procedure_code": "27447",
+      "requested_date": "2026-08-11",
+      "decision_date": "2026-08-11",
+      "status": "Approved" | "Denied" | "Pending",
+      "notes": "All policy criteria satisfied."
+    }
+  ],
+  "claim_history": [
+    {
+      "claim_id": "CLM-001",
+      "procedure": "Total Knee Replacement",
+      "procedure_code": "27447",
+      "service_date": "2026-08-20",
+      "amount_billed": 35000,
+      "amount_paid": 28000,
+      "status": "Accepted" | "Rejected" | "In Progress"
+    }
+  ],
+  "utilization_frequency": {
+    "visits_this_year": 14,
+    "max_allowed_visits_per_year": 30,
+    "procedures_performed": 2,
+    "er_visits": 0,
+    "pt_sessions_count": 12,
+    "pt_sessions_allowed": 20
+  },
+  "coverage_details": {
+    "plan_type": "PPO" | "HMO",
+    "group_number": "AET-GRP-9012",
+    "subscriber_id": "SUB-AET-5541",
+    "benefit_details": {
+      "in_network_coverage_percent": 80,
+      "out_of_network_coverage_percent": 60,
+      "max_out_of_pocket": 5000,
+      "max_out_of_pocket_met": 1850
+    }
+  }
+}
+```
+
+* **HTTP Method:** `PUT`
+* **Endpoint:** `/api/insurance/patients/{patient_id}/administrative`
+* **Content-Type:** `application/json`
+
+#### Incoming Request Payload Structure (Partial Update)
+```json
+{
+  "eligibility": {
+    "coverage_status": "Inactive",
+    "termination_date": "2026-07-01"
+  }
+}
+```
+
+---
+
 ## 3. Real-Time WebSockets
 
 For active claims and simulation workflows, the frontend supports WebSocket channels to update status bars, extraction lists, and processing timelines dynamically without page polling.
