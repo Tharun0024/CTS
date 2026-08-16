@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Loader2, TrendingUp, RotateCcw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { getResubmissionAnalysis } from '../../services/resubmissionApi';
-import { resubmitClaim, getClaimsStore, saveClaimsStore } from '../../services/claimsApi';
+import { resubmitClaim } from '../../services/claimsApi';
 import type { ResubmissionAnalysis as ResubAnalysis } from '../../types/resubmission';
 import { clsx } from 'clsx';
 
@@ -16,6 +16,7 @@ export function ResubmissionAnalysis({ claimId, onResubmitted }: ResubmissionAna
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted]   = useState(false);
   const [error, setError]       = useState('');
+  const [escalationNote, setEscalationNote] = useState('');
 
   useEffect(() => {
     let ok = true;
@@ -33,33 +34,12 @@ export function ResubmissionAnalysis({ claimId, onResubmitted }: ResubmissionAna
   };
 
   const handleEscalateToHuman = async () => {
-    setSubmitting(true);
-    try {
-      const store = getClaimsStore();
-      const idx = store.findIndex(c => c.claim_id === claimId);
-      if (idx !== -1) {
-        store[idx] = {
-          ...store[idx],
-          status: 'HUMAN_REVIEW',
-          updated_at: new Date().toISOString(),
-          timeline: [
-            ...(store[idx].timeline ?? []),
-            {
-              timestamp: new Date().toISOString(),
-              event: 'HUMAN_REVIEW',
-              message: 'Claim escalated to Human Review by provider.'
-            }
-          ]
-        };
-        saveClaimsStore(store);
-      }
-      setSubmitted(true);
-      onResubmitted?.();
-    } catch {
-      setError('Escalation failed. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
+    // Frozen V1 semantics: Agent 1 owns HUMAN_REVIEW escalation. The provider
+    // cannot force it from here — surface the truthful state instead.
+    setEscalationNote(
+      'In the V1 workflow, human review escalation is decided by Agent 1 during evaluation. ' +
+      'Claims that require human judgment are routed to the Review Queue automatically.'
+    );
   };
 
   if (loading) return (
@@ -144,6 +124,7 @@ export function ResubmissionAnalysis({ claimId, onResubmitted }: ResubmissionAna
 
         {/* Error */}
         {error && <p className="text-[12px] text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg font-semibold">{error}</p>}
+        {escalationNote && <p className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg font-semibold">{escalationNote}</p>}
 
         {/* Actions */}
         {submitted ? (

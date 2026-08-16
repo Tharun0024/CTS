@@ -300,8 +300,8 @@ class PriorAuthOrchestrator:
             # Agent 1 Outcome Routing (Frozen V1 Architecture Pattern)
             # ========================================================
             # APPROVE → Terminal success
-            # REQUEST_MORE_INFORMATION → Recovery attempt
-            # REJECTED → Conditional (check is_recoverable flag)
+            # REQUEST_MORE_INFORMATION → Recovery attempt (ONLY recoverable route)
+            # REJECTED → Terminal (frozen routing; is_recoverable is IGNORED)
             # HUMAN_REVIEW → Terminal (safety gate, no Agent 2 action)
             
             if decision == "APPROVED":
@@ -405,121 +405,24 @@ class PriorAuthOrchestrator:
                     missing_info_list = payer_resp.requested_information
 
             elif decision == "REJECTED":
-                # Rejection Recoverability Assessment (Frozen V1 Pattern)
-                # Check is_recoverable flag to determine if this is due to missing evidence (recoverable)
-                # or clinical ineligibility (terminal/hard rejection).
-                
-                if not payer_resp.is_recoverable:
-                    # Hard rejection: Clinical ineligibility (e.g., patient age, disease stage, contraindications)
-                    # Do NOT attempt recovery; escalate to HUMAN_REVIEW
-                    logger.log_transition(claim_id, version, state, "HUMAN_REVIEW", 
-                                        f"Agent 1 rejected claim (terminal/hard). is_recoverable=False. Reason: {payer_resp.reason}")
-                    state = "HUMAN_REVIEW"
-                    self.claim_repo.update_claim_status(claim_id, "HUMAN_REVIEW")
-                    
-                    # Create Human Review record
-                    self.claim_repo.create_human_review(
-                        review_id=f"REV-{uuid.uuid4().hex[:8].upper()}",
-                        claim_id=claim_id,
-                        reason=payer_resp.reason,
-                        failed_criteria=payer_resp.failed_criteria,
-                        missing_information=[],
-                        uncertain_information=[],
-                        recommended_action="Clinical ineligibility per Agent 1. No recovery attempted. Recommend alternative therapy or plan adjustment."
-                    )
-                    completed = True
-                    human_review_required = True
-                    missing_info_list = [payer_resp.reason]
-                else:
-                    # Recoverable rejection: Missing or insufficient evidence for decision
-                    # Attempt recovery by searching provider database
-                    next_state = "ANALYZING_REJECTION"
-                    logger.log_transition(claim_id, version, state, next_state, 
-                                        f"Agent 1 rejected claim (recoverable). is_recoverable=True. Reason: {payer_resp.reason}")
-                    state = next_state
-                    
-                    # Analyze rejection
-                    analysis = self.rejection_analyzer.analyze_payer_response(payer_resp)
-                    failed_ids = analysis["failed_criterion_ids"]
-                    requested_concepts = analysis["requested_concepts"]
-                    
-                    # Check database for missing/failed criteria evidence
-                    logger.log_transition(claim_id, version, state, "RETRIEVING_RECOVERY_EVIDENCE", 
-                                        f"Recovery Search: searching patient DB to resolve criteria: {failed_ids}")
-                    state = "RETRIEVING_RECOVERY_EVIDENCE"
-                    
-                    full_evidence = self.patient_retriever.retrieve_all_evidence(canonical_claim.patient_id)
-                    recovered_matches = []
-                    
-                    for ev in full_evidence:
-                        for concept in requested_concepts:
-                            if concept == "ldl" and ("ldl" in ev.content.lower() or "18262-6" in ev.content.lower()):
-                                recovered_matches.append(ev)
-                            elif concept == "statin" and any(st in ev.content.lower() for st in ["simvastatin", "atorvastatin", "rosuvastatin", "statin"]):
-                                recovered_matches.append(ev)
-                            elif concept == "hemoglobin" and ("hemoglobin" in ev.content.lower() or "718-7" in ev.content.lower()):
-                                recovered_matches.append(ev)
-                            elif concept == "iron" and ("iron" in ev.content.lower() or "ferrous" in ev.content.lower()):
-                                recovered_matches.append(ev)
-                            elif concept == "metformin" and "metformin" in ev.content.lower():
-                                recovered_matches.append(ev)
-                            elif concept == "hba1c" and ("hba1c" in ev.content.lower() or "4548-4" in ev.content.lower()):
-                                recovered_matches.append(ev)
-                            elif concept == "physical therapy" and ("physical therapy" in ev.content.lower() or "pt" in ev.content.lower()):
-                                recovered_matches.append(ev)
-                                
-                    unique_recovered = []
-                    seen_rev_ids = set()
-                    for rm in recovered_matches:
-                        if rm.evidence_id not in seen_rev_ids:
-                            seen_rev_ids.add(rm.evidence_id)
-                            unique_recovered.append(rm)
-                            
-                    # Check if the recovered evidence matches eligibility criteria (e.g. durational checks)
-                    # Let's perform a simple pre-validation. If the recovered statin trial is only 10 days, 
-                    # we do NOT resubmit because it fails the 90-day requirement, and instead we escalate to human review.
-                    eligible = True
-                    ineligibility_reason = ""
-                    
-                    # Check for Scenario E (statin trial too short or undocumented)
-                    for rm in unique_recovered:
-                        if "simvastatin" in rm.content.lower() or "statin" in rm.content.lower():
-                            # Parse trial duration
-                            if "10 days" in rm.content or "20 days" in rm.content:
-                                eligible = False
-                                ineligibility_reason = "Recovered statin trial duration (10 days) does not satisfy the 90-day policy requirement."
-                                break
-                            elif "undocumented" in rm.content.lower() or "uncertain" in rm.content.lower():
-                                # Undocumented duration (Scenario E) -> Uncertain
-                                eligible = False
-                                ineligibility_reason = "Recovered statin trial duration is undocumented; clinical context is uncertain."
-                                break
-                                
-                    if unique_recovered and eligible:
-                        logger.log_transition(claim_id, version, state, "BUILDING_RESUBMISSION", f"Recovery Assessment: Eligible. Preparing Version {version+1}")
-                        state = "BUILDING_RESUBMISSION"
-                        
-                        canonical_claim = self.version_manager.create_new_version(canonical_claim, "SUBMITTED")
-                        version = canonical_claim.claim_version
-                    else:
-                        logger.log_transition(claim_id, version, state, "HUMAN_REVIEW", f"Recovery Assessment: Ineligible ({ineligibility_reason or 'No records found'}). Escalating.")
-                        state = "HUMAN_REVIEW"
-                        self.claim_repo.update_claim_status(claim_id, "HUMAN_REVIEW")
-                        
-                        # Create Human Review record
-                        self.claim_repo.create_human_review(
-                            review_id=f"REV-{uuid.uuid4().hex[:8].upper()}",
-                            claim_id=claim_id,
-                            reason=ineligibility_reason if ineligibility_reason else "Criteria rejected and no matching records found to resolve the failure.",
-                            failed_criteria=failed_ids,
-                            missing_information=[f"Supporting evidence for criteria {failed_ids}"],
-                            uncertain_information=[ineligibility_reason] if "undocumented" in ineligibility_reason else [],
-                            recommended_action="Contact prescribing physician to review patient history or check alternative step therapies."
-                        )
-                        completed = True
-                        human_review_required = True
-                        missing_info_list = [ineligibility_reason] if ineligibility_reason else ["Missing evidence to satisfy: " + ", ".join(failed_ids)]
-                    
+                # Frozen V1 routing (Phase 4): EVERY REJECTED is terminal.
+                # The legacy is_recoverable-based recovery branch has been
+                # removed: documentation insufficiency is always represented
+                # as REQUEST_MORE_INFORMATION by Agent 1 (the only
+                # Agent2-recoverable outcome), so there is no generic
+                # REJECT -> Agent 2 recovery path. The is_recoverable flag is
+                # kept on the PayerResponse schema for compatibility but is
+                # deliberately ignored here.
+                logger.log_transition(
+                    claim_id, version, state, "REJECTED",
+                    f"Agent 1 rejected claim (terminal). Frozen routing: REJECT never "
+                    f"enters Agent 2 recovery (is_recoverable ignored). Reason: {payer_resp.reason}"
+                )
+                state = "REJECTED"
+                self.claim_repo.update_claim_status(claim_id, "REJECTED")
+                completed = True
+                missing_info_list = [payer_resp.reason]
+
         # Check if version limit exceeded
         if version > MAX_RESUBMISSION_ATTEMPTS and not completed:
             logger.log_transition(claim_id, version-1, state, "HUMAN_REVIEW", "Exceeded maximum resubmission limit. Escalating.")

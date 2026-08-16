@@ -171,7 +171,9 @@ class PatientEvidenceRetriever:
             ))
         
         return {
-            "found": list(set(found_evidence)),  # Deduplicate
+            # Deduplicate by evidence_id (Evidence models are not hashable);
+            # insertion order is preserved.
+            "found": list({ev.evidence_id: ev for ev in found_evidence}.values()),
             "missing": missing_evidence
         }
     

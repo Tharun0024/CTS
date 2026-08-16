@@ -235,6 +235,47 @@ def init_db():
     );
     """)
 
+    # Provider Decisions Table (Phase 4: persisted accept/decline consent on
+    # recovered evidence; append-only history, never updated in place)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS provider_decisions (
+        decision_id TEXT PRIMARY KEY,
+        claim_id TEXT,
+        claim_version INTEGER,
+        decision TEXT,
+        evidence_ids TEXT,
+        evidence_request_id TEXT,
+        correlation_id TEXT,
+        reason TEXT,
+        decided_at TEXT,
+        FOREIGN KEY(claim_id) REFERENCES claims(claim_id) ON DELETE CASCADE
+    );
+    """)
+
+    # Claim Records Table (Phase 5A: API boundary snapshots of the current
+    # claim state; the immutable version history lives inside record_json)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS claim_records (
+        claim_id TEXT PRIMARY KEY,
+        patient_id TEXT,
+        status TEXT,
+        record_json TEXT,
+        updated_at TEXT
+    );
+    """)
+
+    # Simulation Records Table (Phase 5B: simulation run snapshots carrying
+    # the simulation -> patient -> claim relationships inside record_json)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS simulation_records (
+        simulation_id TEXT PRIMARY KEY,
+        status TEXT,
+        record_json TEXT,
+        created_at TEXT,
+        updated_at TEXT
+    );
+    """)
+
     conn.commit()
     conn.close()
     print("Database schema initialized successfully at:", DB_PATH)

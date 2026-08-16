@@ -1,5 +1,10 @@
-import { mockRequest } from './api';
-import { getClaimsStore, saveClaimsStore } from './claimsApi';
+// Insurance-side API service — Phase 6: wired to the real FastAPI V1 boundary.
+// The insurer portal reads the same backend claim records the hospital sees;
+// the backend is the single source of truth. Human review decisions are
+// recorded via the human-resolution endpoint (frozen V1 semantics: the claim
+// re-enters normal Agent 1 routing — humans never fabricate final outcomes).
+
+import { getClaimDetails, getClaims, resolveHumanReview } from './claimsApi';
 import type { InsuranceClaim, ClaimDetails, DecisionPayload } from '../types/claim';
 
 const priorityByStatus: Record<string, InsuranceClaim['priority']> = {
@@ -36,76 +41,33 @@ function mapClaimToInsurance(detail: ClaimDetails): InsuranceClaim {
   };
 }
 
-// GET /api/insurance/claims
+// GET /api/insurance/claims — derived from the real claim list.
 export async function getInsuranceClaims(): Promise<InsuranceClaim[]> {
-  const store = getClaimsStore();
-  return mockRequest(store.map(mapClaimToInsurance));
+  const claims = await getClaims();
+  const details = await Promise.all(
+    claims.map((claim) =>
+      getClaimDetails(claim.claim_id).catch(() => null)
+    )
+  );
+  return details
+    .filter((detail): detail is ClaimDetails => detail !== null)
+    .map(mapClaimToInsurance);
 }
 
 // GET /api/insurance/claims/{id}
 export async function getInsuranceClaimDetails(id: string): Promise<ClaimDetails> {
-  const store = getClaimsStore();
-  const detail = store.find(c => c.claim_id === id);
-  if (!detail) throw new Error(`Claim ${id} not found`);
-  return mockRequest({ ...detail });
+  return getClaimDetails(id);
 }
 
-// POST /api/insurance/claims/{id}/decision
+// POST /api/insurance/claims/{id}/decision — recorded as a human-resolution
+// note; the backend re-runs Agent 1 routing (frozen V1 authority model).
 export async function submitDecision(
   claimId: string,
   payload: DecisionPayload
 ): Promise<{ success: boolean; claim_id: string; decision: string }> {
-  const statusMap: Record<string, InsuranceClaim['status']> = {
-    ACCEPT: 'ACCEPTED',
-    REJECT: 'REJECTED',
-    MORE_INFORMATION: 'MORE_INFO',
-    HUMAN_REVIEW: 'HUMAN_REVIEW',
-  };
-
-  const store = getClaimsStore();
-  const idx = store.findIndex(c => c.claim_id === claimId);
-  if (idx !== -1) {
-    const nextStatus = statusMap[payload.decision] ?? store[idx].status;
-
-    // Setup evidence request structure if more info is needed (V1 Workflow)
-    let nextEvRequest = store[idx].evidence_request;
-    let nextResubStatus = store[idx].resubmission_status;
-    let nextEvRequestStatus = store[idx].evidence_request_status;
-
-    if (nextStatus === 'MORE_INFO') {
-      nextEvRequest = {
-        request_id: `EVR-${claimId.replace('CLM-', '')}`,
-        requested_evidence: 'Clinical documentation & treatment logs',
-        reason: payload.comments || 'Missing documentation required for clinical criteria analysis.',
-        status: 'PENDING_PROVIDER_RESPONSE',
-      };
-      nextResubStatus = 'AWAITING_EVIDENCE';
-      nextEvRequestStatus = 'PENDING_PROVIDER_RESPONSE';
-    }
-
-    store[idx] = {
-      ...store[idx],
-      status: nextStatus,
-      decision: {
-        status: payload.decision,
-        reason: payload.comments || payload.reason_code.replace(/_/g, ' '),
-        reason_code: payload.reason_code,
-      },
-      evidence_request: nextEvRequest,
-      resubmission_status: nextResubStatus,
-      evidence_request_status: nextEvRequestStatus,
-      updated_at: new Date().toISOString(),
-      timeline: [
-        ...(store[idx].timeline ?? []),
-        {
-          timestamp: new Date().toISOString(),
-          event: nextStatus,
-          message: `Decision submitted by insurance: ${payload.decision}. Reason: ${payload.comments || payload.reason_code}`
-        }
-      ]
-    };
-    saveClaimsStore(store);
-  }
-
-  return mockRequest({ success: true, claim_id: claimId, decision: payload.decision }, 600);
+  const note =
+    `Human review decision: ${payload.decision} (${payload.reason_code}). ` +
+    (payload.comments || payload.reason_code.replace(/_/g, ' '));
+  await resolveHumanReview(claimId, note);
+  return { success: true, claim_id: claimId, decision: payload.decision };
 }

@@ -67,27 +67,13 @@ def _concepts_for_text(text: str) -> List[str]:
     return concepts
 
 
-def route_agent1_decision(
+def _requested_items_from_decision(
     decision_response: DecisionResponse,
-    patient_id: str,
-    claim_version: int,
-    correlation_id: Optional[str] = None,
-) -> Optional[EvidenceRequest]:
-    """Frozen V1 routing gate: convert an Agent1 decision into the structured
-    evidence request Agent2 consumes -- ONLY for REQUEST_MORE_INFORMATION.
-
-    Returns None for APPROVE, every REJECT (hard denial / coverage exclusion),
-    and HUMAN_REVIEW. Agent2 is never invoked for those outcomes.
-    """
-    if decision_response.outcome != DecisionOutcome.REQUEST_MORE_INFORMATION:
-        return None
-    if not decision_response.agent2_recoverable:
-        # Contract guard: only the Agent2-recoverable outcome may route here.
-        return None
-
-    claim_id = decision_response.claim_id or decision_response.case_id
-
-    # Criterion identifiers / evidence keys, where available from the decision.
+) -> tuple:
+    """Extract (requested_information, criterion_ids, evidence_keys) from one
+    Agent1 decision. requested_information keeps Agent1's structured lines;
+    criterion_ids/evidence_keys are gathered from MISSING evaluations and
+    missing evidence statuses, plus keys parsed from the request lines."""
     criterion_ids = sorted({
         criterion_id
         for criterion_id, evaluation in (decision_response.criteria_evaluations or {}).items()
@@ -111,6 +97,31 @@ def route_agent1_decision(
     if not requested_information:
         # Fall back to bare evidence keys so the request still carries content.
         requested_information = list(evidence_keys)
+    return requested_information, criterion_ids, evidence_keys
+
+
+def route_agent1_decision(
+    decision_response: DecisionResponse,
+    patient_id: str,
+    claim_version: int,
+    correlation_id: Optional[str] = None,
+) -> Optional[EvidenceRequest]:
+    """Frozen V1 routing gate: convert an Agent1 decision into the structured
+    evidence request Agent2 consumes -- ONLY for REQUEST_MORE_INFORMATION.
+
+    Returns None for APPROVE, every REJECT (hard denial / coverage exclusion),
+    and HUMAN_REVIEW. Agent2 is never invoked for those outcomes.
+    """
+    if decision_response.outcome != DecisionOutcome.REQUEST_MORE_INFORMATION:
+        return None
+    if not decision_response.agent2_recoverable:
+        # Contract guard: only the Agent2-recoverable outcome may route here.
+        return None
+
+    claim_id = decision_response.claim_id or decision_response.case_id
+    requested_information, criterion_ids, evidence_keys = _requested_items_from_decision(
+        decision_response
+    )
 
     if not (requested_information or evidence_keys or criterion_ids):
         # Nothing recoverable was requested; do not invoke Agent2.

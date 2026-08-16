@@ -7,6 +7,7 @@ import { PolicyEvidencePanel } from '../../components/shared/PolicyEvidencePanel
 import { ClaimTimeline } from '../../components/shared/ClaimTimeline';
 import { ResubmissionAnalysis } from '../../components/hospital/ResubmissionAnalysis';
 import { MissingInfoUploader } from '../../components/hospital/MissingInfoUploader';
+import { ProviderDecisionPanel } from '../../components/hospital/ProviderDecisionPanel';
 import { LoadingState } from '../../components/common/LoadingState';
 import { ErrorState } from '../../components/common/ErrorState';
 
@@ -286,6 +287,9 @@ export function HospitalClaimDetails() {
               onSubmitted={() => setClaim(prev => prev ? { ...prev, status: 'SUBMITTED_AGAIN' } : prev)}
             />
           )}
+
+          {/* Provider ACCEPT/DECLINE consent on Agent 2 recovered evidence */}
+          <ProviderDecisionPanel claim={claim} onDecided={fetchClaim} />
 
           {(claim.status === 'RESUBMISSION_CHECK' || showResub) && (
             <ResubmissionAnalysis

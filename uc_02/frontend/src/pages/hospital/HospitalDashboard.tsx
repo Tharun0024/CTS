@@ -1,8 +1,15 @@
 import { useNavigate } from 'react-router-dom';
-import { Plus, RefreshCcw, CheckCircle2, FileText, Clock, AlertTriangle, XCircle, ChevronRight, Shield, Play } from 'lucide-react';
+import { Plus, RefreshCcw, CheckCircle2, FileText, Clock, AlertTriangle, XCircle, ChevronRight, Shield, Play, Square, RotateCcw, Activity } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getClaims, getClaimDetails } from '../../services/claimsApi';
-import { startSimulationTrigger } from '../../services/simulationApi';
+import {
+  startSimulationTrigger,
+  getSimulationStatus,
+  stopSimulation,
+  resetSimulation,
+  resimulateSimulation,
+} from '../../services/simulationApi';
+import type { SimulationStatus } from '../../services/simulationApi';
 import type { Claim, ClaimDetails } from '../../types/claim';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -18,9 +25,14 @@ export function HospitalDashboard() {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [priorityClaims, setPriorityClaims] = useState<ClaimDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [simStatus, setSimStatus] = useState<SimulationStatus | null>(null);
+  const [simActionBusy, setSimActionBusy] = useState(false);
 
   const fetchData = (showLoading = true) => {
     if (showLoading) setLoading(true);
+    getSimulationStatus()
+      .then(setSimStatus)
+      .catch(() => setSimStatus(null));
     getClaims().then(async (data) => {
       setClaims(data);
       const priority = data.filter(c => ['REJECTED', 'MORE_INFO', 'HUMAN_REVIEW'].includes(c.status));
@@ -72,6 +84,25 @@ export function HospitalDashboard() {
       .finally(() => {
         setIsSimulating(false);
       });
+  };
+
+  const runSimAction = (action: () => Promise<unknown>) => {
+    setSimActionBusy(true);
+    action()
+      .catch((error: unknown) => {
+        alert((error as { message?: string })?.message ?? 'Simulation action failed.');
+      })
+      .finally(() => {
+        setSimActionBusy(false);
+        fetchData(false);
+      });
+  };
+  const handleStopSimulation = () => runSimAction(() => stopSimulation());
+  const handleResetSimulation = () => runSimAction(() => resetSimulation());
+  const handleResimulate = () => {
+    const simId = simStatus?.simulation_id;
+    if (!simId) return;
+    runSimAction(() => resimulateSimulation(simId));
   };
 
   const total = claims.length;
@@ -241,6 +272,54 @@ export function HospitalDashboard() {
           })}
         </div>
       </div>
+
+      {/* Simulation Control (V1 Simulation Manager — backend owns state) */}
+      {simStatus && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xs font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                <Activity className="w-4 h-4 text-blue-600" />
+                Simulation Control
+              </h2>
+              <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                Run {simStatus.simulation_id ?? '—'} · {String(simStatus.status ?? 'UNKNOWN').replace(/_/g, ' ')}
+              </p>
+            </div>
+            <span className="text-[11px] font-extrabold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200">
+              {simStatus.completed_count ?? (simStatus.patients?.filter(p => p.status === 'COMPLETED').length ?? 0)}/{simStatus.total_count ?? simStatus.patients?.length ?? 0} patients
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleStopSimulation}
+              disabled={simActionBusy || !['RUNNING', 'STOPPING'].includes(simStatus.status ?? '')}
+              className="text-red-600 border-red-200 hover:bg-red-50"
+            >
+              <Square className="w-3.5 h-3.5 mr-1.5" /> Stop
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResimulate}
+              disabled={simActionBusy || simStatus.status === 'RUNNING'}
+            >
+              <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Re-simulate
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetSimulation}
+              disabled={simActionBusy}
+              className="text-slate-600"
+            >
+              <Square className="w-3.5 h-3.5 mr-1.5" /> Reset
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Priority Claims */}
       <Card>

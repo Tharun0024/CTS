@@ -23,6 +23,59 @@ from rag.llm.llm_client import LLMClient
 from rag.llm.prompt_builder import PromptBuilder
 from rag.validation.output_validator import OutputValidator
 
+# Phase 5A: claims API boundary over the existing V1 workflow. The service is
+# created at import time and receives its pipeline components during lifespan.
+from api.claims import ClaimService, build_claims_router
+
+# Phase 5B: simulation + document ingestion boundary. The manager reuses the
+# SAME pipeline components (never a second pipeline) and receives them from
+# the claims service during lifespan.
+from api.simulation import SimulationManager, build_simulation_router
+
+# Phase 7: LOCAL-FIRST storage selection. Default is SQLite + local files via
+# the existing repository interfaces; cloud implementations replace them by
+# implementing the same interfaces (api/persistence/base.py). Set
+# CTS_STORAGE=memory for an ephemeral (non-persistent) local run. No cloud
+# service is ever required to start or run the app.
+def _build_repositories(mode: str) -> Dict[str, Any]:
+    if mode == "memory":
+        return {}  # services fall back to their in-memory defaults
+    from api.persistence.sqlite import (
+        SqliteClaimRecordRepository,
+        SqliteProviderDecisionRepository,
+        SqliteSimulationRepository,
+        SqliteWorkflowEventRepository,
+    )
+
+    return {
+        "claim_store": SqliteClaimRecordRepository(),
+        "provider_decision_store": SqliteProviderDecisionRepository(),
+        "event_store": SqliteWorkflowEventRepository(),
+        "simulation_store": SqliteSimulationRepository(),
+    }
+
+
+_STORAGE_MODE = os.getenv("CTS_STORAGE", "sqlite").strip().lower()
+_REPOSITORIES = _build_repositories(_STORAGE_MODE)
+
+# Local document storage for raw uploads (cloud-swappable via DocumentStore).
+from api.persistence.document_store import LocalFileDocumentStore
+
+CLAIM_SERVICE = ClaimService(
+    claim_store=_REPOSITORIES.get("claim_store"),
+    provider_decision_store=_REPOSITORIES.get("provider_decision_store"),
+    event_store=_REPOSITORIES.get("event_store"),
+)
+SIMULATION_MANAGER = SimulationManager(
+    simulation_store=_REPOSITORIES.get("simulation_store"),
+    document_store=LocalFileDocumentStore(),
+)
+# Simulation-scoped claims must stay reachable through the main /api/claims
+# routes (timeline, versions, provider decisions, human resolution). The
+# locator only routes requests to the owning service; workflow logic is
+# untouched.
+CLAIM_SERVICE.simulation_service_locator = SIMULATION_MANAGER.service_for_claim
+
 # Global variables to cache loaded models and indexes
 CONFIG: Dict[str, Any] = {}
 ALL_CHUNKS: list = []
@@ -107,6 +160,31 @@ async def lifespan(app: FastAPI):
     QUERY_BUILDER = QueryBuilder()
     
     print("RAG API initialization successfully completed.")
+
+    # Phase 5A: wire the loaded pipeline components into the claims API
+    # service so POST /api/claims can run the real V1 pipeline.
+    CLAIM_SERVICE.components = {
+        "config": CONFIG,
+        "all_chunks": ALL_CHUNKS,
+        "all_chunks_dict": ALL_CHUNKS_DICT,
+        "exact_matcher": EXACT_MATCHER,
+        "bge_embedder": BGE_EMBEDDER,
+        "faiss_retriever": FAISS_RETRIEVER,
+        "bm25_retriever": BM25_RETRIEVER,
+        "candidate_pool": CANDIDATE_POOL,
+        "bge_reranker": BGE_RERANKER,
+        "policy_aggregator": POLICY_AGGREGATOR,
+        "deterministic_analyzer": DETERMINISTIC_ANALYZER,
+        "evidence_builder": EVIDENCE_BUILDER,
+        "llm_client": LLM_CLIENT,
+        "prompt_builder": PROMPT_BUILDER,
+        "output_validator": OUTPUT_VALIDATOR,
+        "query_builder": QUERY_BUILDER,
+        "llm_provider": None,
+    }
+    # Phase 5B: the simulation manager reuses the exact same pipeline
+    # components (never a second/special pipeline).
+    SIMULATION_MANAGER.components = CLAIM_SERVICE.components
     yield
 
 app = FastAPI(
@@ -115,6 +193,14 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Phase 5A claims API boundary (create/list/get claims, timeline, evidence
+# requests, provider decisions, version history, human resolution).
+app.include_router(build_claims_router(CLAIM_SERVICE), prefix="/api")
+
+# Phase 5B simulation + document ingestion boundary (start/status/stop/reset,
+# delete, re-simulate, document upload).
+app.include_router(build_simulation_router(SIMULATION_MANAGER), prefix="/api")
 
 @app.post("/triage", response_model=ClaimOutput)
 def triage(claim_input: ClaimInput, debug: bool = Query(False, description="Enable return of debug details in logs")):

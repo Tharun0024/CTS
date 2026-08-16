@@ -34,7 +34,7 @@ export interface EvidenceRequestSummary {
 
 export interface EvidenceResponseSummary {
   evidence: string;
-  decision: Agent2ResultStatus | 'RELEASED';
+  decision: Agent2ResultStatus | 'RELEASED' | 'ESCALATED';
   status: 'SENT_TO_PAYER' | 'RECEIVED' | 'ESCALATED';
   responded_at?: string;
 }
@@ -115,6 +115,54 @@ export interface ClaimDetails {
   resubmission_status?: ResubmissionStatus;
   agent2_result?: Agent2ResultStatus | null;
   reevaluation_status?: string | null;
+  // ---- Live backend record fields (Phase 6; set by the service adapter) ----
+  workflow_state?: string;
+  claim_version?: number;
+  agent2_invoked?: boolean;
+  resubmissions?: number;
+  human_review_reasons?: string[];
+  recovery_result?: RecoveryResult | null;
+  versions?: ClaimVersion[];
+  provider_decisions?: ProviderDecisionRecord[];
+  simulation_id?: string;
+}
+
+// Agent2 recovery result as serialized by the backend (FOUND | MISSING only).
+export interface RecoveryItemResult {
+  request_text: string;
+  criterion_id: string | null;
+  evidence_key: string;
+  state: 'FOUND' | 'MISSING' | string;
+  evidence_ids: string[];
+}
+
+export interface RecoveryResult {
+  evidence_request_id: string;
+  correlation_id?: string | null;
+  claim_id?: string;
+  item_results: RecoveryItemResult[];
+  recovered_evidence_ids: string[];
+  notes?: string[];
+}
+
+export interface ClaimVersion {
+  version: string;
+  attempt?: number;
+  decision?: { status: DecisionStatus; reason: string; reason_code?: string; outcome?: string } | null;
+  new_evidence_delta?: string[];
+  evidence_ids?: string[];
+}
+
+export interface ProviderDecisionRecord {
+  decision_id: string;
+  claim_id: string;
+  claim_version?: number;
+  decision: 'ACCEPT' | 'DECLINE';
+  evidence_ids: string[];
+  evidence_request_id?: string | null;
+  correlation_id?: string | null;
+  reason?: string | null;
+  decided_at?: string;
 }
 
 export interface DocumentRef {

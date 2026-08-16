@@ -318,18 +318,22 @@ class TestScenarioBMissingLdlRecovered:
 
 
 # ---------------------------------------------------------------------------
-# Scenario C: Recoverable REJECT (statin step therapy) -> Agent2 retrieves
-# valid 120-day statin evidence -> V2 -> APPROVE
+# Scenario C: Documentation insufficiency (statin step therapy undocumented)
+# -> REQUEST_MORE_INFORMATION -> Agent2 retrieves valid 120-day statin
+# evidence -> V2 -> APPROVE.
+#
+# Frozen routing: this is represented as REQUEST_MORE_INFORMATION, never as a
+# recoverable REJECT. A documented hard failure (metric present but failing)
+# would be a terminal REJECT with no Agent2 (see TestScenarioF).
 # ---------------------------------------------------------------------------
 
-class TestScenarioCRecoverableRejectStatin:
-    def test_recoverable_reject_statin_recovered_and_approved(self, scenario_registry):
+class TestScenarioCDocumentationInsufficiencyStatin:
+    def test_undocumented_statin_trial_is_rmi_recovered_and_approved(self, scenario_registry):
         chunks = [_chunk("POL-SCEN-C", "C-ST", "At least 120 days of statin step therapy documented.")]
         components = _build_components(chunks)
-        claim = _scenario_claim(
-            "CLM-SCEN-C", "POL-SCEN-C",
-            metrics_extra={"statin_duration_days": 10},  # only a 10-day trial documented in V1
-        )
+        # No statin duration is documented in V1 (metric absent -> MISSING,
+        # not a definitive FAIL), and no statin_trial evidence was submitted.
+        claim = _scenario_claim("CLM-SCEN-C", "POL-SCEN-C")
 
         pool = [
             _ev("statin_trial", "EV-STATIN-150",
@@ -337,16 +341,19 @@ class TestScenarioCRecoverableRejectStatin:
         ]
         result = run_agent2_v1_pipeline(claim, components, recovery_source=_pool_source(pool))
 
-        # V1 must be a REJECT (clinical rule definitely failed), and recoverable
-        assert result.versions[0]["decision"].outcome == DecisionOutcome.REJECT
-        assert classify_decision_for_agent2(result.versions[0]["decision"]) == "RECOVERABLE"
+        # V1 must be REQUEST_MORE_INFORMATION (documentation insufficiency is
+        # never a recoverable REJECT), and it is the only recoverable route.
+        v1 = result.versions[0]["decision"]
+        assert v1.outcome == DecisionOutcome.REQUEST_MORE_INFORMATION
+        assert v1.agent2_recoverable is True
+        assert classify_decision_for_agent2(v1) == "RECOVERABLE"
         # V2 flips to APPROVE via real recovered evidence
         assert result.final_outcome == DecisionOutcome.APPROVE
         assert result.resubmissions == 1
         assert result.versions[1]["new_evidence_delta"] == ["EV-STATIN-150"]
         assert result.versions[1]["claim"]["case_data"]["clinical_metrics"]["statin_duration_days"] == 150
-        # Immutability: the V1 snapshot still carries the original metric
-        assert result.versions[0]["claim"]["case_data"]["clinical_metrics"]["statin_duration_days"] == 10
+        # Immutability: the V1 snapshot never carried the recovered metric.
+        assert result.versions[0]["claim"]["case_data"]["clinical_metrics"].get("statin_duration_days") is None
 
 
 # ---------------------------------------------------------------------------

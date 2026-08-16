@@ -1,186 +1,124 @@
-import { mockRequest } from './api';
-import { mockClaimDetails } from '../mock/claims';
+// Claims API service — Phase 6: wired to the real FastAPI V1 boundary.
+// The backend is the single source of truth for decision, status, versions,
+// evidence, timeline and resubmissions; naming differences are reconciled in
+// backendAdapter.ts at this service/type boundary only.
+
+import { apiFetch } from './api';
+import type { BackendRecord, BackendSummary } from './backendAdapter';
+import { toClaimDetails, toClaimSummary } from './backendAdapter';
 import type { Claim, ClaimDetails, CreateClaimPayload } from '../types/claim';
 
-const LOCAL_STORAGE_KEY = 'authflow_claims_store';
+// Session cache of the most recently fetched backend snapshots. Read-only
+// convenience for components that previously read the localStorage mock
+// store; never authoritative — the backend always is.
+const lastDetails = new Map<string, ClaimDetails>();
 
-function loadClaimsStore(): ClaimDetails[] {
-  const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-  if (saved) {
-    try {
-      return JSON.parse(saved);
-    } catch (e) {
-      console.error('Failed to parse saved claims', e);
-    }
-  }
-  return [...mockClaimDetails];
-}
-
-export function saveClaimsStore(store: ClaimDetails[]) {
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(store));
-}
-
-// Mutable in-memory state for the current session, loaded from localStorage
-let claimsStore: ClaimDetails[] = loadClaimsStore();
-
-// GET /api/claims
+// GET /api/claims (+ /api/simulation/claims for simulation-scoped patients)
 export async function getClaims(): Promise<Claim[]> {
-  const flat = claimsStore.map(cd => ({
-    claim_id: cd.claim_id,
-    patient_id: cd.patient.patient_id,
-    hospital: cd.hospital,
-    procedure: cd.claim.procedure,
-    procedure_code: cd.claim.procedure_code,
-    diagnosis_codes: cd.claim.diagnosis_codes,
-    service_date: cd.claim.service_date,
-    status: cd.status,
-    attempt: cd.attempt,
-    submission_history: cd.submission_history,
-    evidence_request_status: cd.evidence_request_status,
-    resubmission_status: cd.resubmission_status,
-    agent2_result: cd.agent2_result,
-    evidence_request: cd.evidence_request,
-    evidence_response: cd.evidence_response,
-    submitted_at: cd.submitted_at,
-    updated_at: cd.updated_at,
-  }));
-  return mockRequest(flat as Claim[]);
+  const [apiClaims, simClaims] = await Promise.all([
+    apiFetch<BackendSummary[]>('/claims'),
+    apiFetch<BackendSummary[]>('/simulation/claims').catch(() => [] as BackendSummary[]),
+  ]);
+  const seen = new Set<string>();
+  const merged: Claim[] = [];
+  for (const summary of [...apiClaims, ...simClaims]) {
+    if (!summary || seen.has(summary.claim_id)) continue;
+    seen.add(summary.claim_id);
+    merged.push(toClaimSummary(summary));
+  }
+  return merged;
 }
 
-// GET /api/claims/{id}
+// GET /api/claims/{id} — falls back to the owning simulation's real
+// ClaimService record for simulation-scoped claims.
 export async function getClaimDetails(id: string): Promise<ClaimDetails> {
-  const detail = claimsStore.find(c => c.claim_id === id);
-  if (!detail) throw new Error(`Claim ${id} not found`);
-  return mockRequest({ ...detail });
+  let record: BackendRecord | null = null;
+  try {
+    record = await apiFetch<BackendRecord>(`/claims/${encodeURIComponent(id)}`);
+  } catch (error) {
+    if ((error as { status?: number }).status !== 404) throw error;
+  }
+  if (!record) {
+    record = await apiFetch<BackendRecord>(
+      `/simulation/claims?claim_id=${encodeURIComponent(id)}`
+    );
+  }
+  const details = toClaimDetails(record);
+  lastDetails.set(id, details);
+  return details;
 }
 
-// POST /api/claims
+// POST /api/claims — runs the REAL V1 pipeline end-to-end.
 export async function createClaim(payload: CreateClaimPayload): Promise<ClaimDetails> {
-  const newId = `CLM-${String(claimsStore.length + 1).padStart(3, '0')}`;
-
-  const missing: string[] = [];
-  if (!payload.patient_id) missing.push('Patient Identification');
-  if (!payload.procedure) missing.push('Procedure Details');
-  if (!payload.procedure_code) missing.push('Procedure Code');
-  if (!payload.diagnosis_codes || payload.diagnosis_codes.length === 0) missing.push('Diagnosis Codes');
-  if (!payload.service_date) missing.push('Service Date');
-  if (!payload.policy_id) missing.push('Policy/Payer Info');
-
-  const newClaim: ClaimDetails = {
-    claim_id: newId,
-    patient: {
-      patient_id: payload.patient_id || 'PAT-UNSPECIFIED',
-      age: 0,
-      gender: 'Unknown'
-    },
-    claim: {
-      procedure: payload.procedure || 'Unspecified Procedure',
-      procedure_code: payload.procedure_code || 'N/A',
+  const record = await apiFetch<BackendRecord>('/claims', {
+    method: 'POST',
+    body: JSON.stringify({
+      patient_id: payload.patient_id || undefined,
+      payer: payload.payer || undefined,
+      policy_id: payload.policy_id || undefined,
+      procedure_code: payload.procedure_code || undefined,
+      procedure: payload.procedure || undefined,
       diagnosis_codes: payload.diagnosis_codes ?? [],
-      service_date: payload.service_date || new Date().toISOString().split('T')[0],
-      provider_id: payload.provider_id || '',
-    },
-    policy: {
-      payer: payload.payer || 'Unspecified Payer',
-      policy_id: payload.policy_id || 'N/A',
-      policy_name: `${payload.payer || 'Unspecified'} Policy`
-    },
-    decision: missing.length > 0 ? {
-      status: 'MORE_INFORMATION',
-      reason: 'Automated policy analysis identified missing clinical or patient information required for review.',
-    } : null,
-    policy_evidence: [],
-    missing_information: missing,
-    resubmission: { eligible: missing.length > 0, status: 'SUBMITTED' },
-    attempt: 1,
-    submission_history: [{
-      attempt: 1,
-      submitted_at: new Date().toISOString(),
-      status: missing.length > 0 ? 'MORE_INFO' : 'SUBMITTED',
-      note: missing.length > 0 ? 'Additional information required.' : 'Initial submission created.',
-    }],
-    evidence_request: missing.length > 0 ? {
-      request_id: `EVR-${newId.replace('CLM-', '')}`,
-      requested_evidence: 'Supporting Clinical Documentation',
-      reason: 'Required documentation is missing',
-      status: 'PENDING_PROVIDER_RESPONSE',
-    } : null,
-    evidence_response: null,
-    evidence_request_status: missing.length > 0 ? 'PENDING_PROVIDER_RESPONSE' : 'CLOSED',
-    resubmission_status: missing.length > 0 ? 'AWAITING_EVIDENCE' : 'NOT_REQUIRED',
-    agent2_result: null,
-    reevaluation_status: null,
-    status: missing.length > 0 ? 'MORE_INFO' : 'SUBMITTED',
-    submitted_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    hospital: 'City General Hospital',
-    documents: [],
-    timeline: [
-      { timestamp: new Date().toISOString(), event: 'SUBMITTED', message: 'Claim submitted' },
-      ...(missing.length > 0 ? [{
-        timestamp: new Date().toISOString(),
-        event: 'MORE_INFO',
-        message: 'Status changed to More Info Needed due to missing fields: ' + missing.join(', ')
-      }] : [])
-    ],
-  };
-
-  claimsStore = [newClaim, ...claimsStore];
-  saveClaimsStore(claimsStore);
-
-  // Simulate async status transition only if no missing fields, or keep as MORE_INFO if missing
-  if (missing.length === 0) {
-    setTimeout(() => {
-      const idx = claimsStore.findIndex(c => c.claim_id === newId);
-      if (idx !== -1) {
-        claimsStore[idx] = {
-          ...claimsStore[idx],
-          status: 'PROCESSING',
-          updated_at: new Date().toISOString(),
-          timeline: [
-            ...(claimsStore[idx].timeline ?? []),
-            { timestamp: new Date().toISOString(), event: 'PROCESSING', message: 'Claim transitioned to processing' }
-          ]
-        };
-        saveClaimsStore(claimsStore);
-      }
-    }, 2000);
-  }
-
-  return mockRequest(newClaim, 600);
+      service_date: payload.service_date || undefined,
+      provider_id: payload.provider_id || undefined,
+    }),
+  });
+  const details = toClaimDetails(record);
+  lastDetails.set(details.claim_id, details);
+  return details;
 }
 
-// POST /api/claims/{id}/resubmit
+// V1 frozen routing: REQUEST_MORE_INFORMATION automatically routes to Agent 2
+// recovery and re-evaluation — there is no separate manual resubmission step.
+// This keeps the existing call sites honest by re-reading the backend state.
 export async function resubmitClaim(id: string): Promise<{ success: boolean; claim_id: string }> {
-  const idx = claimsStore.findIndex(c => c.claim_id === id);
-  if (idx !== -1) {
-    claimsStore[idx] = {
-      ...claimsStore[idx],
-      status: 'SUBMITTED_AGAIN',
-      attempt: (claimsStore[idx].attempt ?? 1) + 1,
-      submission_history: [
-        ...(claimsStore[idx].submission_history ?? []),
-        {
-          attempt: (claimsStore[idx].attempt ?? 1) + 1,
-          submitted_at: new Date().toISOString(),
-          status: 'SUBMITTED_AGAIN',
-          note: 'Resubmitted after evidence review.',
-        },
-      ],
-      evidence_request_status: 'RECEIVED',
-      resubmission_status: 'RESUBMITTED',
-      updated_at: new Date().toISOString(),
-      timeline: [
-        ...(claimsStore[idx].timeline ?? []),
-        { timestamp: new Date().toISOString(), event: 'SUBMITTED_AGAIN', message: 'Claim resubmitted' },
-      ],
-    };
-    saveClaimsStore(claimsStore);
-  }
-  return mockRequest({ success: true, claim_id: id }, 500);
+  await getClaimDetails(id);
+  return { success: true, claim_id: id };
 }
 
-// Export store accessor (used by polling)
-export function getClaimsStore() {
-  return claimsStore;
+// POST /api/claims/{id}/provider-decision — provider ACCEPT/DECLINE consent
+// on Agent2-recovered evidence (control-plane record + audit trail).
+export async function postProviderDecision(
+  claimId: string,
+  decision: 'ACCEPT' | 'DECLINE',
+  reason?: string,
+  evidenceIds: string[] = []
+): Promise<{ decision_id: string; decision: 'ACCEPT' | 'DECLINE' }> {
+  return apiFetch(`/claims/${encodeURIComponent(claimId)}/provider-decision`, {
+    method: 'POST',
+    body: JSON.stringify({ decision, reason: reason ?? null, evidence_ids: evidenceIds }),
+  });
+}
+
+// GET /api/claims/{id}/provider-decisions
+export async function getProviderDecisions(claimId: string): Promise<unknown[]> {
+  const body = await apiFetch<{ provider_decisions: unknown[] }>(
+    `/claims/${encodeURIComponent(claimId)}/provider-decisions`
+  );
+  return body.provider_decisions;
+}
+
+// POST /api/claims/{id}/human-resolution — resolve a HUMAN_REVIEW hold; the
+// claim re-enters normal Agent 1 routing afterwards (frozen V1 semantics).
+export async function resolveHumanReview(
+  claimId: string,
+  resolutionNote: string
+): Promise<ClaimDetails> {
+  const record = await apiFetch<BackendRecord>(
+    `/claims/${encodeURIComponent(claimId)}/human-resolution`,
+    { method: 'POST', body: JSON.stringify({ resolution_note: resolutionNote }) }
+  );
+  const details = toClaimDetails(record);
+  lastDetails.set(claimId, details);
+  return details;
+}
+
+// Legacy accessors kept for compatibility: now read-only views over the last
+// fetched backend snapshots (writes are no-ops — the backend owns the data).
+export function getClaimsStore(): ClaimDetails[] {
+  return [...lastDetails.values()];
+}
+
+export function saveClaimsStore(_store: ClaimDetails[]): void {
+  // Intentional no-op: claim state lives in the backend, not in the browser.
 }

@@ -334,22 +334,19 @@ _FACT_META_KEYS = {
 
 
 def classify_decision_for_agent2(decision: DecisionResponse) -> str:
-    """Route an Agent 1 DecisionResponse for Agent 2 handling.
+    """Route an Agent 1 DecisionResponse for Agent 2 handling (frozen V1).
 
-    APPROVE/ACCEPT            -> terminal, no Agent 2 recovery.
+    REQUEST_MORE_INFORMATION  -> the ONLY recoverable outcome -> Agent 2.
+    APPROVE                   -> terminal, no Agent 2 recovery.
     HUMAN_REVIEW              -> terminal, no direct Agent 2 recovery.
-    REJECT with exclusion     -> hard terminal REJECT, no recovery.
-    REJECT without exclusion  -> recoverable (missing/failed evidence may exist).
-    REQUEST_MORE_INFORMATION  -> recoverable.
+    REJECT                    -> terminal hard denial, no recovery -- for ANY
+                                 reason (coverage exclusion OR hard criterion
+                                 failure). There is NO generic REJECT -> Agent2
+                                 path. Documentation insufficiency is always
+                                 represented as REQUEST_MORE_INFORMATION by
+                                 Agent 1, never as a recoverable REJECT.
     """
     outcome = decision.outcome
-    if outcome == DecisionOutcome.APPROVE or outcome == DecisionOutcome.HUMAN_REVIEW:
-        return _ROUTE_TERMINAL
-    if outcome == DecisionOutcome.REJECT:
-        if any(decision.exclusion_results.values()):
-            # Hard coverage exclusion: terminal by definition.
-            return _ROUTE_TERMINAL
-        return _ROUTE_RECOVERABLE
     if outcome == DecisionOutcome.REQUEST_MORE_INFORMATION:
         return _ROUTE_RECOVERABLE
     return _ROUTE_TERMINAL
@@ -428,9 +425,9 @@ def _decision_to_payer_response(decision: DecisionResponse) -> Any:
     ]
     reason = "; ".join(reason_lines) if reason_lines else str(decision.outcome)
 
-    is_recoverable = True
-    if decision.outcome == DecisionOutcome.REJECT and any(decision.exclusion_results.values()):
-        is_recoverable = False
+    # Frozen routing: only REQUEST_MORE_INFORMATION is Agent2-recoverable.
+    # Every REJECT (hard criterion failure or coverage exclusion) is terminal.
+    is_recoverable = decision.outcome == DecisionOutcome.REQUEST_MORE_INFORMATION
 
     return PayerResponse(
         submission_id=decision.claim_id or decision.case_id,
@@ -589,6 +586,13 @@ class Agent2V1Result:
     human_review_reasons: List[str] = field(default_factory=list)
     sensitive_blocked: bool = False
     audit_trail: List[str] = field(default_factory=list)
+    # Phase 3 contract fields: structured evidence request Agent2 received and
+    # its FOUND/MISSING recovery result (None when Agent2 was never invoked).
+    evidence_request: Optional[Any] = None
+    recovery_result: Optional[Any] = None
+    provider_declined: bool = False
+    # Phase 4 control plane: enforced lifecycle states + immutable audit trail.
+    control_plane: Optional[Any] = None
 
 
 def _default_recovery_source_factory(adapter: Optional[RuntimeAdapter] = None):
@@ -608,21 +612,40 @@ def run_agent2_v1_pipeline(
     components: Dict[str, Any],
     recovery_source=None,
     max_resubmissions: Optional[int] = None,
+    provider_decision: str = "ACCEPT",
+    control_plane=None,
+    persist_workflow_db: bool = False,
 ) -> Agent2V1Result:
     """Run the real V1 pipeline with Agent 2 evidence recovery integrated.
 
     Flow: CanonicalClaim -> RAG -> Agent 1 -> DecisionResponse -> routing ->
-    Agent 2 recovery (provider-side only) -> release gate -> SubmissionPackage
-    -> Agent 1 again -> final outcome.
+    structured EvidenceRequest -> Agent 2 provider-side recovery (FOUND /
+    MISSING per requested item) -> sensitivity/release gate -> provider
+    accept/decline -> SubmissionPackage (V2+) -> Agent 1 again -> final
+    outcome.
 
     ``recovery_source(requested_keys, concepts, claim) -> [evidence items]``
     supplies the provider-side evidence pool; defaults to the provider DB via
     RuntimeAdapter.get_provider_evidence_pool. Claim versions are immutable
     (V1 -> V2 -> ...) and the loop is bounded by MAX_RESUBMISSION_ATTEMPTS so
     Agent 1 <-> Agent 2 can never loop forever.
+
+    ``provider_decision`` models the provider accept/decline gate on recovered
+    evidence: any value other than "ACCEPT" stops the resubmission and
+    escalates to HUMAN_REVIEW (Agent 2 never overrides provider consent).
+
+    Phase 4 control plane: every important state/action transition is enforced
+    against the frozen lifecycle (RMI is the only recovery route; REJECT and
+    APPROVE are terminal; HUMAN_REVIEW can never enter recovery directly) and
+    recorded as an immutable audit event carrying correlation_id and
+    evidence_request_id. Pass ``control_plane`` to share state across runs
+    (e.g. human-resolution re-entry); ``persist_workflow_db=True`` also writes
+    events/provider decisions to the agent2 SQLite database.
     """
     from agent2.config import MAX_RESUBMISSION_ATTEMPTS
     from agent2.reasoning.rejection_analyzer import RejectionAnalyzer
+    from agent2.recovery import run_contract_recovery
+    from agent2.workflow.control_plane import ClaimWorkflowState, WorkflowControlPlane
 
     if recovery_source is None:
         recovery_source = _default_recovery_source_factory()
@@ -635,10 +658,33 @@ def run_agent2_v1_pipeline(
     sensitive_blocked = False
     agent2_invoked = False
     resubmissions = 0
+    evidence_request: Optional[Any] = None
+    recovery_result: Optional[Any] = None
+    provider_declined = False
 
     analyzer = RejectionAnalyzer()
 
+    # Phase 4 control plane: enforced legal transitions + immutable events.
+    cp = control_plane or WorkflowControlPlane(persist_db=persist_workflow_db)
+    wf_claim_id = str(canonical_claim.get("claim_id") or "UNKNOWN-CLAIM")
+    # Version continuity across runs sharing one control plane (re-entry).
+    wf_version_offset = max(0, cp.current_version(wf_claim_id) - 1)
+
+    def wf_transition(state, action, version=None, correlation_id=None, erqid=None, detail=None):
+        return cp.transition(
+            wf_claim_id,
+            state,
+            action,
+            claim_version=version if version is not None else len(versions) + wf_version_offset,
+            correlation_id=correlation_id,
+            evidence_request_id=erqid,
+            detail=detail,
+        )
+
     current_claim = deepcopy(canonical_claim)
+    if cp.current_state(wf_claim_id) == ClaimWorkflowState.INIT:
+        wf_transition(ClaimWorkflowState.RECEIVED, "Claim received for Agent1 evaluation", version=1 + wf_version_offset)
+    wf_transition(ClaimWorkflowState.EVALUATING, f"Agent1 evaluating V{1 + wf_version_offset}", version=1 + wf_version_offset)
     decision = run_integrated_pipeline(current_claim, components)
     versions.append({
         "version": "V1",
@@ -656,18 +702,39 @@ def run_agent2_v1_pipeline(
         if route != _ROUTE_RECOVERABLE:
             if decision.outcome == DecisionOutcome.APPROVE:
                 audit.append("Routing: APPROVE is terminal; Agent2 not invoked.")
+                wf_transition(ClaimWorkflowState.APPROVED, "Agent1 APPROVE: terminal, no Agent2 recovery")
             elif decision.outcome == DecisionOutcome.HUMAN_REVIEW:
                 audit.append("Routing: HUMAN_REVIEW is terminal; no direct Agent2 recovery.")
                 human_review_reasons.append("Agent1 escalated to HUMAN_REVIEW; no direct Agent2 recovery.")
+                wf_transition(
+                    ClaimWorkflowState.HUMAN_REVIEW,
+                    "Agent1 HUMAN_REVIEW escalation; no direct Agent2 recovery",
+                    detail="; ".join(decision.reasoning[-2:]) if decision.reasoning else None,
+                )
             else:
-                audit.append("Routing: hard terminal REJECT (exclusion); no Agent2 recovery.")
+                audit.append(
+                    "Routing: REJECT is terminal (hard denial / coverage exclusion); "
+                    "no Agent2 recovery."
+                )
+                wf_transition(
+                    ClaimWorkflowState.REJECTED,
+                    "Agent1 REJECT: terminal, no Agent2 recovery",
+                    detail=str(decision.reason_code.value if decision.reason_code else ""),
+                )
             break
+
+        wf_transition(
+            ClaimWorkflowState.ROUTED_RECOVERY,
+            "REQUEST_MORE_INFORMATION routed to Agent2 (only recoverable outcome)",
+            correlation_id=f"CORR-{decision.claim_id or decision.case_id}-V{len(versions)}",
+        )
 
         admin_reason = _administrative_block_reason(current_claim)
         if admin_reason:
             audit.append(
                 f"Routing: terminal administrative REJECT ({admin_reason}); Agent2 not invoked."
             )
+            wf_transition(ClaimWorkflowState.REJECTED, f"Administrative gate: {admin_reason}")
             final_outcome_override = DecisionOutcome.REJECT
             break
 
@@ -679,6 +746,7 @@ def run_agent2_v1_pipeline(
             )
             audit.append(reason)
             human_review_reasons.append(reason)
+            wf_transition(ClaimWorkflowState.HUMAN_REVIEW, reason)
             final_outcome_override = DecisionOutcome.HUMAN_REVIEW
             break
 
@@ -695,13 +763,64 @@ def run_agent2_v1_pipeline(
         existing_ids = {
             item.get("evidence_id") for item in current_claim.get("evidence", []) if isinstance(item, dict)
         }
-        candidates = _select_recovered_evidence(pool, requested_keys, concepts, existing_ids)
+
+        # Phase 3 contract: Agent2 receives ONLY the structured EvidenceRequest
+        # and tracks each requested item as FOUND or MISSING against the
+        # provider pool (never SATISFIED; never fabricated).
+        metrics_for_id = (current_claim.get("case_data") or {}).get("clinical_metrics") or {}
+        recovery_patient_id = (
+            current_claim.get("patient_id")
+            or metrics_for_id.get("patient_id")
+            or metrics_for_id.get("member_id")
+            or ""
+        )
+        plan = run_contract_recovery(
+            decision,
+            patient_id=recovery_patient_id,
+            claim_version=len(versions),
+            pool=pool,
+        )
+        if plan is not None:
+            evidence_request = plan.request
+            recovery_result = plan.result
+            audit.append(
+                f"Agent2 contract recovery: request={plan.request.evidence_request_id} "
+                f"correlation={plan.request.correlation_id} "
+                f"FOUND={plan.found_evidence_ids} MISSING={plan.result.missing_requests}"
+            )
+            # Contract-driven selection: only items the contract tracked as
+            # FOUND (real provider records) may proceed. Items already part of
+            # the current version are never re-appended.
+            candidates = [
+                item for item in plan.selected_pool_items
+                if item.get("evidence_id") not in existing_ids
+            ]
+        else:
+            # Defensive fallback: RMI without any structured request content.
+            # Legacy minimum-necessary selection of real pool records.
+            candidates = _select_recovered_evidence(pool, requested_keys, concepts, existing_ids)
         audit.append(f"Agent2 recovery: pool_size={len(pool)}, candidates={[c.get('evidence_id') for c in candidates]}")
+
+        # Control plane: recovery ran over the provider pool; carry the contract
+        # IDs through every subsequent event for end-to-end traceability.
+        wf_correlation = plan.request.correlation_id if plan is not None else None
+        wf_erq = plan.request.evidence_request_id if plan is not None else None
+        wf_transition(
+            ClaimWorkflowState.RECOVERING,
+            "Agent2 EvidenceRequest recovery over provider pool (FOUND/MISSING)",
+            correlation_id=wf_correlation,
+            erqid=wf_erq,
+            detail=(
+                f"FOUND={plan.found_evidence_ids} MISSING={plan.result.missing_requests}"
+                if plan is not None else "legacy fallback selection"
+            ),
+        )
 
         if not candidates:
             reason = "No recoverable provider-side evidence found; nothing was fabricated. Escalating to HUMAN_REVIEW."
             audit.append(reason)
             human_review_reasons.append(reason)
+            wf_transition(ClaimWorkflowState.HUMAN_REVIEW, reason, correlation_id=wf_correlation, erqid=wf_erq)
             final_outcome_override = DecisionOutcome.HUMAN_REVIEW
             break
 
@@ -715,6 +834,7 @@ def run_agent2_v1_pipeline(
             )
             audit.append(reason)
             human_review_reasons.append(reason)
+            wf_transition(ClaimWorkflowState.HUMAN_REVIEW, reason, correlation_id=wf_correlation, erqid=wf_erq)
             final_outcome_override = DecisionOutcome.HUMAN_REVIEW
             break
 
@@ -725,6 +845,39 @@ def run_agent2_v1_pipeline(
             reason = "Recovered evidence failed provenance validation against the provider pool."
             audit.append(reason)
             human_review_reasons.append(reason)
+            wf_transition(ClaimWorkflowState.HUMAN_REVIEW, reason, correlation_id=wf_correlation, erqid=wf_erq)
+            final_outcome_override = DecisionOutcome.HUMAN_REVIEW
+            break
+
+        # Provider accept/decline gate: recovered evidence is only resubmitted
+        # with provider consent; decline escalates to HUMAN_REVIEW. The consent
+        # decision is persisted as a first-class workflow record.
+        wf_transition(
+            ClaimWorkflowState.AWAITING_PROVIDER_DECISION,
+            "Provider accept/decline gate on recovered evidence",
+            correlation_id=wf_correlation,
+            erqid=wf_erq,
+        )
+        released_ids = [item.get("evidence_id") for item in released]
+        cp.record_provider_decision(
+            wf_claim_id,
+            provider_decision,
+            claim_version=len(versions) + wf_version_offset,
+            evidence_ids=released_ids,
+            evidence_request_id=wf_erq,
+            correlation_id=wf_correlation,
+            reason="Recovered provider evidence consent gate",
+        )
+        if str(provider_decision).strip().upper() != "ACCEPT":
+            provider_declined = True
+            reason = (
+                f"Provider declined resubmission of recovered evidence "
+                f"(decision='{provider_decision}'); no V{len(versions) + 1} is built. "
+                "Escalating to HUMAN_REVIEW."
+            )
+            audit.append(reason)
+            human_review_reasons.append(reason)
+            wf_transition(ClaimWorkflowState.HUMAN_REVIEW, reason, correlation_id=wf_correlation, erqid=wf_erq)
             final_outcome_override = DecisionOutcome.HUMAN_REVIEW
             break
 
@@ -732,6 +885,14 @@ def run_agent2_v1_pipeline(
         resubmissions += 1
         version_label = f"V{len(versions) + 1}"
         attempt_no = (next_claim.get("submission") or {}).get("attempt") or (resubmissions + 1)
+
+        wf_transition(
+            ClaimWorkflowState.RESUBMITTING,
+            f"Provider ACCEPT; building immutable {version_label} with released delta",
+            correlation_id=wf_correlation,
+            erqid=wf_erq,
+            detail=f"delta={delta_ids}",
+        )
 
         submission_package = {
             "version": version_label,
@@ -742,6 +903,9 @@ def run_agent2_v1_pipeline(
             ],
             "new_evidence_delta": delta_ids,
             "released": True,
+            # Phase 4: contract IDs propagate through the submission.
+            "correlation_id": wf_correlation,
+            "evidence_request_id": wf_erq,
         }
         submissions.append(submission_package)
         audit.append(
@@ -749,6 +913,13 @@ def run_agent2_v1_pipeline(
         )
 
         # Re-run the SAME Agent 1 pipeline (RAG included) on the new version.
+        wf_transition(
+            ClaimWorkflowState.EVALUATING,
+            f"Agent1 re-evaluating {version_label}",
+            version=len(versions) + 1 + wf_version_offset,
+            correlation_id=wf_correlation,
+            erqid=wf_erq,
+        )
         decision = run_integrated_pipeline(next_claim, components)
         versions.append({
             "version": version_label,
@@ -773,6 +944,73 @@ def run_agent2_v1_pipeline(
         human_review_reasons=human_review_reasons,
         sensitive_blocked=sensitive_blocked,
         audit_trail=audit,
+        evidence_request=evidence_request,
+        recovery_result=recovery_result,
+        provider_declined=provider_declined,
+        control_plane=cp,
+    )
+
+
+def reenter_after_human_resolution(
+    canonical_claim: Dict[str, Any],
+    components: Dict[str, Any],
+    control_plane,
+    attached_evidence: Optional[List[Dict[str, Any]]] = None,
+    recovery_source=None,
+    max_resubmissions: Optional[int] = None,
+    provider_decision: str = "ACCEPT",
+    resolution_note: str = "",
+) -> Agent2V1Result:
+    """Re-enter the workflow after a human resolution of a HUMAN_REVIEW hold.
+
+    Frozen lifecycle: Agent 2 NEVER resumes recovery directly from
+    HUMAN_REVIEW. The resolution transitions the claim
+    HUMAN_REVIEW -> RESOLVED_REENTRY -> RECEIVED, and the claim then goes
+    through NORMAL Agent 1 routing exactly like any submission (same frozen
+    classifier: RMI -> Agent2 recovery; REJECT/APPROVE -> terminal).
+
+    ``control_plane`` must be the control plane that tracked the claim into
+    HUMAN_REVIEW (state is enforced; resolving a claim that is not in
+    HUMAN_REVIEW raises IllegalWorkflowTransition).
+
+    ``attached_evidence`` are real provider records (dicts with real
+    evidence_id) the human resolution adds to the claim; they enter as a new
+    append-only claim version (history is never overwritten). Fabricated
+    entries (no evidence_id) are rejected.
+    """
+    from agent2.workflow.control_plane import ClaimWorkflowState
+
+    claim_id = str(canonical_claim.get("claim_id") or "UNKNOWN-CLAIM")
+    cp = control_plane
+    cp.resolve_human_review(claim_id, resolution_note=resolution_note)
+
+    claim = deepcopy(canonical_claim)
+    next_version = cp.current_version(claim_id)
+    if attached_evidence:
+        for item in attached_evidence:
+            if not isinstance(item, dict) or not item.get("evidence_id"):
+                raise ValueError(
+                    "Human-attached evidence must be real provider records carrying "
+                    "an evidence_id (no fabricated evidence)."
+                )
+        claim, _ = _build_next_version_claim(claim, list(attached_evidence))
+        next_version += 1
+
+    # RESOLVED_REENTRY -> RECEIVED: normal Agent 1 routing resumes from here.
+    cp.transition(
+        claim_id,
+        ClaimWorkflowState.RECEIVED,
+        "Human resolution re-enters normal Agent1 routing",
+        claim_version=next_version,
+        detail=resolution_note or None,
+    )
+    return run_agent2_v1_pipeline(
+        claim,
+        components,
+        recovery_source=recovery_source,
+        max_resubmissions=max_resubmissions,
+        provider_decision=provider_decision,
+        control_plane=cp,
     )
 
 
