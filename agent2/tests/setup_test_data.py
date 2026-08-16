@@ -1,7 +1,7 @@
 import sqlite3
 import json
 from datetime import datetime
-from database.db_manager import get_db_connection
+from ..database.db_manager import get_db_connection
 
 def seed_test_patients():
     print("Seeding test patients into SQLite clinical database...")

@@ -2,9 +2,18 @@ import os
 import json
 from typing import List
 from abc import ABC, abstractmethod
-from config import POLICIES_DIR, CMS_JSONL_PATH
-from schemas.policy import PolicyCriterion
-from schemas.evidence import PolicyEvidence
+
+# Try to import from config with fallback
+try:
+    from agent2.config import POLICIES_DIR, CMS_JSONL_PATH
+except ImportError:
+    # Fallback: use default paths
+    PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    POLICIES_DIR = os.path.join(PROJECT_ROOT, "payer-knowledge")
+    CMS_JSONL_PATH = os.path.join(PROJECT_ROOT, "payer-knowledge", "CMS_NCD_LCD_Dataset.json")
+
+from ..schemas.policy import PolicyCriterion
+from ..schemas.evidence import PolicyEvidence
 
 class PolicyRetriever(ABC):
     @abstractmethod

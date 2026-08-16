@@ -2,8 +2,20 @@ import os
 import json
 import sqlite3
 from datetime import datetime
-from config import FHIR_DIR, DB_PATH
-from database.db_manager import get_db_connection, init_db
+import sys
+
+# Add project root to path
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, PROJECT_ROOT)
+
+try:
+    from agent2.config import FHIR_DIR, DB_PATH
+except ImportError:
+    # Fallback: use default paths
+    FHIR_DIR = os.path.join(PROJECT_ROOT, "data", "raw")
+    DB_PATH = os.path.join(PROJECT_ROOT, "agent2", "workspace", "agent2.db")
+
+from .db_manager import get_db_connection, init_db
 
 def import_fhir_bundles(limit=None):
     """Parses Synthea FHIR JSON bundles and loads them into SQLite."""

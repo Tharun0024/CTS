@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
-from database.repositories.claim_repository import ClaimRepository
-from schemas.claim import CanonicalClaim
+from ..database.repositories.claim_repository import ClaimRepository
+from ..schemas.claim import CanonicalClaim
 
 class VersionManager:
     """Manages the creation and tracking of immutable claim versions."""

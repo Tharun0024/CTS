@@ -1,5 +1,5 @@
 import uuid
-from database.repositories.audit_repository import AuditRepository
+from ..database.repositories.audit_repository import AuditRepository
 
 class AuditLogger:
     """Orchestrates structured audit logging for state transitions and claims activities."""

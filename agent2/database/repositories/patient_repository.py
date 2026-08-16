@@ -1,5 +1,5 @@
 import sqlite3
-from database.db_manager import get_db_connection
+from ..db_manager import get_db_connection
 
 class PatientRepository:
     def __init__(self):

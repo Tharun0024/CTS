@@ -1,6 +1,6 @@
 import re
 from typing import List
-from schemas.evidence import Evidence
+from ..schemas.evidence import Evidence
 
 class EvidenceRanker:
     def __init__(self):

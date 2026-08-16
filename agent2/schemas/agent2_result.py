@@ -1,8 +1,8 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from schemas.policy import CriterionEvaluation
-from schemas.evidence import Evidence
-from schemas.submission import SubmissionPackage
+from .policy import CriterionEvaluation
+from .evidence import Evidence
+from .submission import SubmissionPackage
 
 class Agent2Result(BaseModel):
     agent2_run_id: str = Field(description="Unique ID for this specific orchestration run")

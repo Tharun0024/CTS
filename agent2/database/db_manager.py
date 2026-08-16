@@ -1,6 +1,14 @@
 import sqlite3
 import os
-from config import DB_PATH
+import sys
+
+# Try to import from config with fallback
+try:
+    from agent2.config import DB_PATH
+except ImportError:
+    # Fallback: use default path
+    PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    DB_PATH = os.path.join(PROJECT_ROOT, "agent2", "workspace", "agent2.db")
 
 def get_db_connection():
     """Returns a connection to the SQLite database."""

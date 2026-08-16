@@ -1,7 +1,20 @@
 import json
-from agent1.payer_engine import PayerEngine
-from schemas.submission import SubmissionPackage
-from schemas.payer_response import PayerResponse
+import os
+import sys
+
+# Add agent2 root to path for agent1 module access
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+AGENT2_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, AGENT2_ROOT)
+
+try:
+    from agent1.payer_engine import PayerEngine
+except ModuleNotFoundError:
+    # Fallback: import from relative path
+    from ..agent1.payer_engine import PayerEngine
+
+from ..schemas.submission import SubmissionPackage
+from ..schemas.payer_response import PayerResponse
 
 class Agent1Client:
     """Adapter for Agent 2 to communicate with Agent 1 (Payer).

@@ -1,6 +1,6 @@
 from typing import List, Dict
-from schemas.claim import CanonicalClaim
-from database.repositories.patient_repository import PatientRepository
+from ..schemas.claim import CanonicalClaim
+from ..database.repositories.patient_repository import PatientRepository
 
 class ClaimValidator:
     def __init__(self):

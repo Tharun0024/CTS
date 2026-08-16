@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import datetime
-from database.db_manager import get_db_connection
+from ..db_manager import get_db_connection
 
 class AuditRepository:
     def __init__(self):

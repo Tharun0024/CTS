@@ -1,38 +1,53 @@
 import json
+import os
+import sys
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
-from google import genai
-from google.genai import types
+import requests
 
-from config import GEMINI_API_KEY
-from schemas.policy import PolicyCriterion, CriterionEvaluation
-from schemas.evidence import Evidence
-from validators.llm_output_validator import LLMOutputValidator
+# Add project root to path
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, PROJECT_ROOT)
+
+try:
+    from agent2.config import NVIDIA_API_KEY, NVIDIA_BASE_URL, NVIDIA_MODEL, GEMINI_API_KEY
+except ImportError:
+    NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
+    NVIDIA_BASE_URL = os.getenv("NVIDIA_API_URL", "https://integrate.api.nvidia.com/v1")
+    NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "meta/llama-3.1-8b-instruct")
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+from ..schemas.policy import PolicyCriterion, CriterionEvaluation
+from ..schemas.evidence import Evidence
+from ..validators.llm_output_validator import LLMOutputValidator
 
 class CriterionEvaluationsContainer(BaseModel):
     evaluations: List[CriterionEvaluation] = Field(description="Checklist of evaluated policy criteria")
 
 class CriterionMapper:
-    def __init__(self, api_key: str = None):
-        self.api_key = api_key if api_key else GEMINI_API_KEY
+    def __init__(self, api_key: str = None, base_url: str = None, model: str = None):
+        self.api_key = api_key if api_key else NVIDIA_API_KEY
+        self.base_url = base_url if base_url else NVIDIA_BASE_URL
+        self.model = model if model else NVIDIA_MODEL
 
     def evaluate_criteria(self, criteria: List[PolicyCriterion], evidence: List[Evidence], requested_drug_or_service: str) -> List[CriterionEvaluation]:
-        """Calls Gemini to evaluate criteria, falling back to deterministic Python evaluation on API failures."""
+        """Calls NVIDIA LLM to evaluate criteria, falling back to deterministic Python evaluation on API failures."""
         
         try:
             if not self.api_key:
-                raise ValueError("Gemini API key not found. Using fallback.")
+                raise ValueError("NVIDIA API key not found. Using fallback.")
                 
-            return self._evaluate_with_gemini(criteria, evidence, requested_drug_or_service)
+            return self._evaluate_with_nvidia(criteria, evidence, requested_drug_or_service)
         except Exception as e:
-            print(f"\n[Warning] Gemini API evaluation failed: {e}")
+            print(f"\n[Warning] NVIDIA API evaluation failed: {e}")
             print("Enacting deterministic Python clinical rule-based evaluator fallback...\n")
             return self._evaluate_with_python_fallback(criteria, evidence, requested_drug_or_service)
 
-    def _evaluate_with_gemini(self, criteria: List[PolicyCriterion], evidence: List[Evidence], requested_drug_or_service: str) -> List[CriterionEvaluation]:
-        """Helper to call Gemini API and parse structured evaluations."""
-        client = genai.Client(api_key=self.api_key)
+    def _evaluate_with_nvidia(self, criteria: List[PolicyCriterion], evidence: List[Evidence], requested_drug_or_service: str) -> List[CriterionEvaluation]:
+        """Helper to call NVIDIA API and parse structured evaluations."""
+        if not self.api_key:
+            raise ValueError("NVIDIA API key not found. Using fallback.")
         
         criteria_str = ""
         for c in criteria:
@@ -42,9 +57,21 @@ class CriterionMapper:
         for ev in evidence:
             evidence_str += f"- [{ev.evidence_id}] Date: {ev.event_date} | Type: {ev.evidence_type} | Content: {ev.content}\n"
 
-        prompt = f"""
-You are an expert clinical reviewer and prior authorization evaluator. Match the patient's retrieved clinical evidence candidates against the normalized coverage policy criteria.
+        system_prompt = """You are an expert clinical reviewer and prior authorization evaluator. 
+        Match the patient's retrieved clinical evidence candidates against the normalized coverage policy criteria.
+        
+        Instructions:
+        1. Determine the status: "SATISFIED", "NOT_SATISFIED", or "UNCERTAIN".
+           - "SATISFIED": The evidence demonstrates that the patient meets the criterion (e.g. lab value within threshold, age is ok).
+           - "NOT_SATISFIED": The evidence demonstrates that the patient does not meet the criterion (e.g. trial was only 10 days when 90 are required).
+           - "UNCERTAIN": The evidence is ambiguous or incomplete to determine satisfaction (e.g. medication exists but duration/start date is undocumented).
+        2. If there is no evidence, mark "NOT_SATISFIED" or "UNCERTAIN". DO NOT fabricate details.
+        3. For "SATISFIED" criteria, you MUST list the supporting evidence IDs in patient_evidence_ids.
+        4. Provide a brief explanation.
+        5. Return your evaluation as a structured JSON object according to the schema.
+        """
 
+        user_prompt = f"""
 Requested Drug/Service: {requested_drug_or_service}
 
 ### Normalized Policy Criteria:
@@ -53,45 +80,76 @@ Requested Drug/Service: {requested_drug_or_service}
 ### Patient Clinical Evidence Candidates:
 {evidence_str}
 
-### Instructions:
-Evaluate each policy criterion systematically:
-1. Determine the status: "SATISFIED", "NOT_SATISFIED", or "UNCERTAIN".
-   - "SATISFIED": The evidence demonstrates that the patient meets the criterion (e.g. lab value within threshold, age is ok).
-   - "NOT_SATISFIED": The evidence demonstrates that the patient does not meet the criterion (e.g. trial was only 10 days when 90 are required).
-   - "UNCERTAIN": The evidence is ambiguous or incomplete to determine satisfaction (e.g. medication exists but duration/start date is undocumented).
-2. If there is no evidence, mark "NOT_SATISFIED" or "UNCERTAIN". DO NOT fabricate details.
-3. For "SATISFIED" criteria, you MUST list the supporting evidence IDs in patient_evidence_ids.
-4. Provide a brief explanation.
-
-Return your evaluation as a structured JSON object according to the schema.
+Return a JSON object with an "evaluations" array containing the criterion evaluations.
 """
 
-        # We use gemini-flash-latest or gemini-pro-latest depending on access, but let's default to gemini-pro-latest 
-        # since it is standard and we can handle fallback anyway
-        model_name = 'gemini-pro-latest'
-        
-        response = client.models.generate_content(
-            model=model_name,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=CriterionEvaluationsContainer,
-                temperature=0.1
-            )
-        )
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
 
-        container = CriterionEvaluationsContainer.model_validate_json(response.text)
-        evaluations = container.evaluations
-        
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "temperature": 0.1,
+            "max_tokens": 2000,
+            "response_format": {"type": "json_object"}
+        }
+
+        try:
+            response = requests.post(
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+            response.raise_for_status()
+            
+            result = response.json()
+            llm_output = result["choices"][0]["message"]["content"]
+            
+            # Parse the JSON output
+            import re
+            # Extract JSON from possible markdown code blocks
+            json_match = re.search(r'```json\n(.*?)\n```', llm_output, re.DOTALL)
+            if json_match:
+                llm_output = json_match.group(1)
+            
+            # Validate JSON structure before parsing
+            json_errors = LLMOutputValidator.validate_llm_json_structure(llm_output)
+            if json_errors:
+                raise ValueError(f"LLM output JSON validation failed: {json_errors[0]}")
+            
+            container = CriterionEvaluationsContainer.model_validate_json(llm_output)
+            evaluations = container.evaluations
+            
+        except Exception as e:
+            raise ValueError(f"NVIDIA API call failed: {str(e)}")
+
+        # Map back criterion descriptions and policy references
         desc_map = {c.criterion_id: c.description for c in criteria}
         ref_map = {c.criterion_id: c.policy_reference for c in criteria}
         for ev_result in evaluations:
             ev_result.criterion_description = desc_map.get(ev_result.criterion_id, ev_result.criterion_description)
             ev_result.policy_evidence_id = ref_map.get(ev_result.criterion_id, "")
 
+        # Validate evaluations
         validation_errors = LLMOutputValidator.validate_evaluations(evaluations, evidence)
+        
+        # Validate criterion coverage
+        expected_criterion_ids = {c.criterion_id for c in criteria}
+        coverage_errors = LLMOutputValidator.validate_criterion_coverage(evaluations, expected_criterion_ids)
+        validation_errors.extend(coverage_errors)
+        
+        # Detect fabricated content
+        fabrication_errors = LLMOutputValidator.detect_fabricated_content(evaluations, evidence)
+        validation_errors.extend(fabrication_errors)
+        
         if validation_errors:
-            raise ValueError(f"LLM Output logical validation failed: {validation_errors[0]}")
+            raise ValueError(f"LLM Output validation failed: {validation_errors[0]}")
 
         return evaluations
 

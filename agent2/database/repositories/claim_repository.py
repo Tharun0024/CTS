@@ -1,8 +1,8 @@
 import sqlite3
 import json
 from datetime import datetime
-from database.db_manager import get_db_connection
-from schemas.policy import CriterionEvaluation
+from ..db_manager import get_db_connection
+from ...schemas.policy import CriterionEvaluation
 
 class ClaimRepository:
     def __init__(self):

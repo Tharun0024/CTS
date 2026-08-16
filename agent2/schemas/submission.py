@@ -1,8 +1,8 @@
 from pydantic import BaseModel, Field
 from typing import List
-from schemas.claim import DiagnosisInfo, ServiceInfo
-from schemas.evidence import Evidence
-from schemas.policy import CriterionEvaluation
+from .claim import DiagnosisInfo, ServiceInfo
+from .evidence import Evidence
+from .policy import CriterionEvaluation
 
 class SubmissionPackage(BaseModel):
     submission_id: str = Field(description="Unique identifier for the submission package")

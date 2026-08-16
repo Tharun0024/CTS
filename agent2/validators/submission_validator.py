@@ -1,5 +1,6 @@
 from typing import List
-from schemas.submission import SubmissionPackage
+from ..schemas.submission import SubmissionPackage
+from .evidence_validator import EvidenceValidator
 
 class SubmissionValidator:
     """Enforces patient safety and trust boundaries before a package is sent to the payer."""
@@ -38,5 +39,38 @@ class SubmissionValidator:
                 errors.append(
                     f"Data Inconsistency: Evidence '{rid}' is referenced in evaluations but is missing from the package clinical evidence list."
                 )
+        
+        # 3. Check for sensitive evidence (should have been blocked earlier)
+        sensitive_evidence = EvidenceValidator.detect_sensitive_evidence(package.clinical_evidence)
+        if sensitive_evidence:
+            errors.append(
+                f"Sensitive Evidence Alert: Package contains sensitive evidence IDs: {', '.join(sensitive_evidence)}"
+            )
+        
+        # 4. Validate evidence provenance
+        provenance_errors = EvidenceValidator.validate_evidence_provenance(package.clinical_evidence)
+        errors.extend(provenance_errors)
+        
+        # 5. Check patient reference anonymization
+        if not package.patient_reference.startswith("PAT-REF-"):
+            errors.append(
+                f"Patient Reference not properly anonymized: '{package.patient_reference}'"
+            )
 
         return errors
+    
+    @staticmethod
+    def validate_minimum_necessary(package: SubmissionPackage, all_evidence_count: int) -> bool:
+        """Validates that package contains minimum necessary evidence."""
+        package_evidence_count = len(package.clinical_evidence)
+        
+        # If package has more than 50% of all evidence, that's suspicious
+        if all_evidence_count > 0 and package_evidence_count > all_evidence_count * 0.5:
+            return False
+        
+        # Package should have at least some evidence if there are SATISFIED criteria
+        satisfied_criteria = [c for c in package.criterion_results if c.status == "SATISFIED"]
+        if satisfied_criteria and package_evidence_count == 0:
+            return False
+        
+        return True

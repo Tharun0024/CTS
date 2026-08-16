@@ -1,7 +1,19 @@
 from typing import List, Dict, Any
 import json
-from schemas.submission import SubmissionPackage
-from schemas.payer_response import PayerResponse
+import os
+import sys
+
+# Add agent2 root to path
+AGENT2_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, AGENT2_ROOT)
+
+try:
+    from schemas.submission import SubmissionPackage
+    from schemas.payer_response import PayerResponse
+except ImportError:
+    # Fallback: try relative imports
+    from ..schemas.submission import SubmissionPackage
+    from ..schemas.payer_response import PayerResponse
 
 class PayerEngine:
     """Simulates the payer-side (Agent 1) coverage determination engine."""

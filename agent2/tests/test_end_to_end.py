@@ -2,10 +2,10 @@ import json
 import os
 import sys
 from datetime import datetime
-from database.db_manager import get_db_connection
-from database.repositories.claim_repository import ClaimRepository
-from database.repositories.audit_repository import AuditRepository
-from workflow.orchestrator import PriorAuthOrchestrator
+from ..database.db_manager import get_db_connection
+from ..database.repositories.claim_repository import ClaimRepository
+from ..database.repositories.audit_repository import AuditRepository
+from ..workflow.orchestrator import PriorAuthOrchestrator
 
 def print_banner(title):
     print("\n" + "="*80)
@@ -61,7 +61,12 @@ def run_test_suite():
     audit_repo = AuditRepository()
     
     # Verify Gemini API key is present
-    from config import GEMINI_API_KEY
+    # Try to import from config with fallback
+    try:
+        from config import GEMINI_API_KEY
+    except ImportError:
+        import os
+        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
     if not GEMINI_API_KEY:
         print("\n[WARNING] GEMINI_API_KEY is not set in environment or .env! LLM mapping calls will fail.")
         sys.exit(1)
