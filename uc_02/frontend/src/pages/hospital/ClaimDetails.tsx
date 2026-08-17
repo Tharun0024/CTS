@@ -12,7 +12,9 @@ import { LoadingState } from '../../components/common/LoadingState';
 import { ErrorState } from '../../components/common/ErrorState';
 
 import { getClaimDetails } from '../../services/claimsApi';
-import { viewClaimPolicyContext } from '../../utils/policyViewer';
+import { PolicyModal } from '../../components/shared/PolicyModal';
+import { HumanReviewWorkspace } from '../../components/shared/HumanReviewWorkspace';
+import { HospitalHumanResolutionPanel } from '../../components/hospital/HospitalHumanResolutionPanel';
 import { decisionLabel } from '../../utils/decisionHumanizer';
 import { usePolling, isTerminalStatus } from '../../services/polling';
 import type { ClaimDetails, ClaimVersion } from '../../types/claim';
@@ -27,6 +29,7 @@ export function HospitalClaimDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showResub, setShowResub] = useState(false);
+  const [isPolicyOpen, setIsPolicyOpen] = useState(false);
 
   const fetchClaim = useCallback(async () => {
     if (!id) return;
@@ -93,8 +96,7 @@ export function HospitalClaimDetails() {
   };
 
   const handleViewPolicyDetails = () => {
-    // Real policy context rendered from the live claim record (gap 6).
-    viewClaimPolicyContext(claim);
+    setIsPolicyOpen(true);
   };
 
   return (
@@ -107,7 +109,7 @@ export function HospitalClaimDetails() {
           <BannerIcon className={clsx('w-5 h-5 flex-shrink-0 mt-0.5', banner.iconCls, isSpinning && 'animate-spin')} />
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-extrabold text-slate-900">{banner.title}</p>
-            {banner.msg && <p className="text-[12px] text-slate-600 font-medium mt-0.5">{banner.msg}</p>}
+            {banner.msg && <p className="text-[12px] text-slate-600 font-medium mt-0.5 whitespace-pre-wrap">{banner.msg}</p>}
           </div>
           {claim.status === 'ACCEPTED' && (
             <span className="flex-shrink-0 text-[11px] font-extrabold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg">
@@ -298,6 +300,13 @@ export function HospitalClaimDetails() {
             <PolicyEvidencePanel evidence={claim.policy_evidence} policyName={claim.policy.policy_name} policyId={claim.policy.policy_id} portal="hospital" onViewPolicy={handleViewPolicyDetails} />
           )}
 
+          {claim.status === 'HUMAN_REVIEW' && (
+            <>
+              <HumanReviewWorkspace claim={claim} portal="hospital" />
+              <HospitalHumanResolutionPanel claim={claim} onResolved={fetchClaim} />
+            </>
+          )}
+
           {claim.status === 'MORE_INFO' && claim.missing_information.length > 0 && (
             <MissingInfoUploader
               claimId={claim.claim_id}
@@ -354,6 +363,14 @@ export function HospitalClaimDetails() {
 
         </div>
       </div>
+      {claim && (
+        <PolicyModal
+          isOpen={isPolicyOpen}
+          onClose={() => setIsPolicyOpen(false)}
+          policyId={claim.policy.policy_id}
+          claim={claim}
+        />
+      )}
     </div>
   );
 }

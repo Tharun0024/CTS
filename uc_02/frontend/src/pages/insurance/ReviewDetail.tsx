@@ -8,6 +8,7 @@ import { HumanReviewPanel } from '../../components/insurance/HumanReviewPanel';
 import { LoadingState } from '../../components/common/LoadingState';
 import { ErrorState } from '../../components/common/ErrorState';
 import { getReviewDetails } from '../../services/reviewApi';
+import { HumanReviewWorkspace } from '../../components/shared/HumanReviewWorkspace';
 import type { ReviewDetails } from '../../types/claim';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -100,6 +101,10 @@ export function ReviewDetail() {
               policyId={claim.policy.policy_id}
               portal="insurance"
             />
+          )}
+
+          {claim.status === 'HUMAN_REVIEW' && (
+            <HumanReviewWorkspace claim={claim} portal="insurance" />
           )}
 
           {claim.missing_information.length > 0 && (

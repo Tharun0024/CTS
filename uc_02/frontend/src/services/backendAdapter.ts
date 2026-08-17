@@ -47,6 +47,10 @@ export interface BackendRecord {
     reasoning?: string[];
     agent2_recoverable?: boolean;
     requested_information?: string[];
+    criteria_results?: Record<string, boolean>;
+    criteria_evaluations?: Record<string, any>;
+    referenced_evidence_ids?: string[];
+    criterion_assessments?: Record<string, any>;
   } | null;
   agent2_invoked?: boolean;
   resubmissions?: number;
@@ -325,6 +329,12 @@ export function toClaimDetails(record: BackendRecord): ClaimDetails {
       patient_id: record.patient_id ?? canonical.patient_id ?? 'UNKNOWN',
       age: typeof caseData.patient_age === 'number' ? caseData.patient_age : 0,
       gender: (metrics['patient_gender'] as string) ?? 'Unknown',
+      name: (metrics['patient_name'] as string) ?? undefined,
+      dob: (metrics['patient_dob'] as string) ?? undefined,
+      address: (metrics['patient_address'] as string) ?? undefined,
+      contact: (metrics['patient_phone'] as string) ?? (metrics['patient_contact'] as string) ?? undefined,
+      relationship: (metrics['patient_relationship'] as string) ?? undefined,
+      policy_holder: (metrics['policy_holder'] as string) ?? undefined,
     },
     claim: {
       procedure: (metrics['claim_procedure'] as string) ?? procedures[0] ?? 'Unspecified procedure',
@@ -340,10 +350,12 @@ export function toClaimDetails(record: BackendRecord): ClaimDetails {
     decision: decision
       ? {
           status: (decision.status ?? decision.outcome ?? 'HUMAN_REVIEW') as DecisionStatus,
-          // Raw backend trace is converted to a concise human-readable
-          // explanation here (gap 7); status/reason_code are preserved as-is.
           reason: humanizeDecision(decision),
           reason_code: decision.reason_code ?? undefined,
+          criteria_results: decision.criteria_results,
+          criteria_evaluations: decision.criteria_evaluations,
+          referenced_evidence_ids: decision.referenced_evidence_ids,
+          criterion_assessments: decision.criterion_assessments,
         }
       : null,
     policy_evidence: mapPolicyEvidence(record),

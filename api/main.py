@@ -343,3 +343,92 @@ def evaluate_claim(canonical_claim: Dict[str, Any], debug: bool = Query(False, d
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
+
+@app.get("/api/policies/{policy_id}")
+def get_policy_details(policy_id: str):
+    """
+    GET /api/policies/{policy_id}
+    Retrieves and aggregates real policy metadata from the existing RAG policy corpus.
+    """
+    config_path = os.path.join("config", "config.yaml")
+    if not os.path.exists(config_path):
+        raise HTTPException(status_code=404, detail="Configuration file not found.")
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+    normalized_path = config["paths"]["normalized_data"]
+    if not os.path.exists(normalized_path):
+        raise HTTPException(status_code=404, detail="Policy database not found.")
+    with open(normalized_path, "r", encoding="utf-8") as f:
+        policies = json.load(f)
+    
+    # Filter chunks matching this policy_id (case-insensitive fallback)
+    matches = [p for p in policies if p.get("policy_id") == policy_id]
+    if not matches:
+        matches = [p for p in policies if p.get("policy_id", "").lower() == policy_id.lower()]
+    
+    if not matches:
+        raise HTTPException(status_code=404, detail=f"Policy {policy_id} not found in corpus.")
+    
+    first = matches[0]
+    
+    procedure_codes = []
+    for m in matches:
+        for code in m.get("procedure_codes", []):
+            if code not in procedure_codes:
+                procedure_codes.append(code)
+                
+    diagnosis_codes = []
+    for m in matches:
+        for code in m.get("diagnosis_codes", []):
+            if code not in diagnosis_codes:
+                diagnosis_codes.append(code)
+                
+    criteria = []
+    seen_crit = set()
+    for m in matches:
+        crit_id = m.get("criterion_id")
+        if crit_id and crit_id not in seen_crit:
+            seen_crit.add(crit_id)
+            criteria.append({
+                "criterion_id": crit_id,
+                "criterion_name": m.get("criterion_name") or m.get("criterion_title") or f"Criterion {crit_id}",
+                "text": m.get("text") or "",
+                "documentation_requirements": m.get("documentation_requirements") or []
+            })
+            
+    exclusions = []
+    for m in matches:
+        for exc in m.get("exclusions", []):
+            if exc not in exclusions:
+                exclusions.append(exc)
+                
+    limitations = []
+    for m in matches:
+        for lim in m.get("limitations", []):
+            if lim not in limitations:
+                limitations.append(lim)
+                
+    contraindications = []
+    for m in matches:
+        for con in m.get("contraindications", []):
+            if con not in contraindications:
+                contraindications.append(con)
+                
+    return {
+        "policy_id": first.get("policy_id"),
+        "policy_title": first.get("policy_title") or first.get("name") or "Policy details",
+        "payer": first.get("payer"),
+        "clinical_domain": first.get("clinical_domain"),
+        "procedure_codes": procedure_codes,
+        "diagnosis_codes": diagnosis_codes,
+        "criteria": criteria,
+        "exclusions": exclusions,
+        "limitations": limitations,
+        "contraindications": contraindications,
+        "source_reference": first.get("source_reference"),
+        "policy_status": first.get("policy_status"),
+        "effective_date": first.get("effective_date"),
+        "revision_date": first.get("revision_date"),
+    }
+
+

@@ -3,6 +3,7 @@
 // backend; the frontend only triggers and reads via these endpoints.
 
 import { apiFetch } from './api';
+import { clearClaimsCache } from './claimsApi';
 
 interface StartSimulationRequest {
   source: string;
@@ -47,6 +48,7 @@ export async function startSimulationTrigger(
       body: JSON.stringify({
         source: payload.source,
         count: payload.count ?? 5,
+        pause_seconds: 45.0, // UI simulation runs are paced at 45s per patient
       }),
     });
   } catch (error) {
@@ -76,7 +78,10 @@ export async function stopSimulation(simulationId?: string): Promise<unknown> {
 // POST /api/simulation/reset
 export async function resetSimulation(simulationId?: string): Promise<unknown> {
   const query = simulationId ? `?simulation_id=${encodeURIComponent(simulationId)}` : '';
-  return apiFetch(`/simulation/reset${query}`, { method: 'POST' });
+  const result = await apiFetch(`/simulation/reset${query}`, { method: 'POST' });
+  clearClaimsCache();
+  localStorage.removeItem('orca_read_notifications');
+  return result;
 }
 
 // DELETE /api/simulation/{simulation_id}

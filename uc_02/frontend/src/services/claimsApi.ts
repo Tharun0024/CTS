@@ -122,3 +122,12 @@ export function getClaimsStore(): ClaimDetails[] {
 export function saveClaimsStore(_store: ClaimDetails[]): void {
   // Intentional no-op: claim state lives in the backend, not in the browser.
 }
+
+export async function getPolicyDetails(policyId: string): Promise<any> {
+  return apiFetch<any>(`/policies/${encodeURIComponent(policyId)}`);
+}
+
+export function clearClaimsCache(): void {
+  lastDetails.clear();
+}
+

@@ -129,7 +129,7 @@ class SimulationManager:
                     f"Simulation {active} is already running; exactly one run at a time."
                 )
 
-            simulation_id = f"SIM-{uuid.uuid4().hex[:8].upper()}"
+            simulation_id = f"SIM-{uuid.uuid4().hex[:12].upper()}"
             factory = self.patient_factory or DefaultPatientFactory(policy_id=request.policy_id)
             provider_store = SimulatedProviderStore()
             service = self._build_claim_service(provider_store)
@@ -217,12 +217,31 @@ class SimulationManager:
             return self._public_record(record)
 
     def reset(self, simulation_id: Optional[str] = None) -> Dict[str, Any]:
-        """Reset = stop + delete the targeted (or latest) simulation's data."""
+        """Reset = stop + delete targeted simulation (or ALL simulations if none specified)."""
         with self._lock:
-            sim_id = simulation_id or self._latest_simulation_id()
-            if sim_id is None:
+            if simulation_id:
+                return self.delete(simulation_id)
+            
+            # If no simulation_id is specified, delete ALL simulations
+            sim_records = self.simulation_store.list()
+            sim_ids = [s.get("simulation_id") for s in sim_records if s.get("simulation_id")]
+            if not sim_ids:
                 raise SimulationNotFound("No simulation to reset.")
-            return self.delete(sim_id)
+            
+            deleted_counts = {
+                "deleted": True,
+                "simulations_deleted": len(sim_ids),
+                "patients_deleted": 0,
+                "claims_deleted": []
+            }
+            
+            for sim_id in sim_ids:
+                res = self.delete(sim_id)
+                deleted_counts["patients_deleted"] += res.get("patients_deleted", 0)
+                deleted_counts["claims_deleted"].extend(res.get("claims_deleted", []))
+                
+            self._issued_patient_ids.clear()
+            return deleted_counts
 
     def delete(self, simulation_id: str) -> Dict[str, Any]:
         """Delete ONLY the patients/claims/data belonging to this simulation."""
@@ -398,7 +417,7 @@ class SimulationManager:
             patient = record["patients"][patient_index]
 
         text, mode = extract_document_text(filename, content)
-        document_id = f"DOC-{uuid.uuid4().hex[:8].upper()}"
+        document_id = f"DOC-{uuid.uuid4().hex[:12].upper()}"
         # Persist the raw bytes locally (Phase 7) before extraction feeds
         # the pipeline; the reference travels in extracted_facts only.
         storage_reference = None

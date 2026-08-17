@@ -74,6 +74,10 @@ export interface ClaimDecision {
   reason: string;
   reason_code?: string;
   comments?: string;
+  criteria_results?: Record<string, boolean>;
+  criteria_evaluations?: Record<string, any>;
+  referenced_evidence_ids?: string[];
+  criterion_assessments?: Record<string, any>;
 }
 
 export interface ClaimDetails {
@@ -83,6 +87,11 @@ export interface ClaimDetails {
     age: number;
     gender: string;
     name?: string;
+    dob?: string;
+    address?: string;
+    contact?: string;
+    relationship?: string;
+    policy_holder?: string;
   };
   claim: {
     procedure: string;

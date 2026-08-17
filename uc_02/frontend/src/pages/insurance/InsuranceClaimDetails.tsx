@@ -3,11 +3,13 @@ import { useParams } from 'react-router-dom';
 import { ClaimHeader } from '../../components/shared/ClaimHeader';
 import { PatientInfoCard } from '../../components/shared/PatientInfoCard';
 import { PolicyEvidencePanel } from '../../components/shared/PolicyEvidencePanel';
+import { ClaimTimeline } from '../../components/shared/ClaimTimeline';
+import { HumanReviewWorkspace } from '../../components/shared/HumanReviewWorkspace';
 import { DecisionPanel } from '../../components/insurance/DecisionPanel';
 import { LoadingState } from '../../components/common/LoadingState';
 import { ErrorState } from '../../components/common/ErrorState';
 import { getInsuranceClaimDetails } from '../../services/insuranceApi';
-import { viewClaimPolicyContext } from '../../utils/policyViewer';
+import { PolicyModal } from '../../components/shared/PolicyModal';
 import { decisionLabel } from '../../utils/decisionHumanizer';
 import { usePolling, isTerminalStatus } from '../../services/polling';
 import type { ClaimDetails, ClaimVersion, DecisionStatus } from '../../types/claim';
@@ -19,6 +21,7 @@ export function InsuranceClaimDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [decisionMade, setDecisionMade] = useState<DecisionStatus | null>(null);
+  const [isPolicyOpen, setIsPolicyOpen] = useState(false);
 
   const fetchClaim = useCallback(async () => {
     if (!id) return;
@@ -209,8 +212,12 @@ export function InsuranceClaimDetails() {
               policyName={claim.policy.policy_name}
               policyId={claim.policy.policy_id}
               portal="insurance"
-              onViewPolicy={() => viewClaimPolicyContext(claim)}
+              onViewPolicy={() => setIsPolicyOpen(true)}
             />
+          )}
+
+          {claim.status === 'HUMAN_REVIEW' && (
+            <HumanReviewWorkspace claim={claim} portal="insurance" />
           )}
 
           {/* Missing information list */}
@@ -239,7 +246,7 @@ export function InsuranceClaimDetails() {
                 </div>
                 <div>
                   <dt className="text-[11px] text-slate-500 mb-1">Reason</dt>
-                  <dd className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded border border-slate-100 font-medium">
+                  <dd className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded border border-slate-100 font-medium whitespace-pre-wrap">
                     {claim.decision.reason}
                   </dd>
                 </div>
@@ -251,12 +258,20 @@ export function InsuranceClaimDetails() {
 
         {/* Right: Decision Panel + Timeline + policy reference + documents */}
         <div className="space-y-4">
-          <DecisionPanel
-            claimId={claim.claim_id}
-            recommendation={claim.decision?.status}
-            reason={claim.decision?.reason}
-            onDecisionMade={(d) => setDecisionMade(d)}
-          />
+          {claim.status === 'HUMAN_REVIEW' && (
+            <DecisionPanel
+              claimId={claim.claim_id}
+              recommendation={claim.decision?.status}
+              reason={claim.decision?.reason}
+              onDecisionMade={(d) => {
+                setDecisionMade(d);
+                fetchClaim();
+              }}
+            />
+          )}
+          {claim.timeline && (
+            <ClaimTimeline events={claim.timeline} portal="insurance" />
+          )}
 
           {/* Policy reference */}
           <div className="bg-white rounded-lg border border-slate-200 p-3.5 shadow-sm animate-fade-in-up stagger-2">
@@ -278,7 +293,7 @@ export function InsuranceClaimDetails() {
             <div className="border-t border-slate-100 pt-2 mt-3">
               <button
                 type="button"
-                onClick={() => viewClaimPolicyContext(claim)}
+                onClick={() => setIsPolicyOpen(true)}
                 className="text-[11px] font-bold text-brand-600 hover:text-brand-700 hover:underline"
               >
                 View Policy Details
@@ -288,6 +303,14 @@ export function InsuranceClaimDetails() {
 
         </div>
       </div>
+      {claim && (
+        <PolicyModal
+          isOpen={isPolicyOpen}
+          onClose={() => setIsPolicyOpen(false)}
+          policyId={claim.policy.policy_id}
+          claim={claim}
+        />
+      )}
     </div>
   );
 }

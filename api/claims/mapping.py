@@ -93,6 +93,29 @@ def serialize_decision(decision: Optional[DecisionResponse]) -> Optional[Dict[st
     if decision is None:
         return None
     reason_code = getattr(decision, "reason_code", None)
+    
+    # Serialize criteria_evaluations Pydantic models
+    criteria_evals = {}
+    if getattr(decision, "criteria_evaluations", None):
+        for k, v in decision.criteria_evaluations.items():
+            if hasattr(v, "model_dump"):
+                criteria_evals[k] = v.model_dump(mode="json")
+            elif hasattr(v, "dict"):
+                criteria_evals[k] = v.dict()
+            else:
+                criteria_evals[k] = v
+
+    # Serialize criterion_assessments Pydantic models
+    crit_assessments = {}
+    if getattr(decision, "criterion_assessments", None):
+        for k, v in decision.criterion_assessments.items():
+            if hasattr(v, "model_dump"):
+                crit_assessments[k] = v.model_dump(mode="json")
+            elif hasattr(v, "dict"):
+                crit_assessments[k] = v.dict()
+            else:
+                crit_assessments[k] = v
+
     return {
         "outcome": decision.outcome.value,                 # backend truth
         "status": map_decision_status(decision.outcome),   # frontend contract
@@ -100,7 +123,12 @@ def serialize_decision(decision: Optional[DecisionResponse]) -> Optional[Dict[st
         "reasoning": list(decision.reasoning or []),
         "agent2_recoverable": bool(decision.agent2_recoverable),
         "requested_information": list(decision.requested_information or []),
+        "criteria_results": dict(getattr(decision, "criteria_results", None) or {}),
+        "criteria_evaluations": criteria_evals,
+        "referenced_evidence_ids": list(getattr(decision, "referenced_evidence_ids", None) or []),
+        "criterion_assessments": crit_assessments,
     }
+
 
 
 def serialize_event(event: WorkflowEvent) -> Dict[str, Any]:

@@ -27,6 +27,11 @@ export function PatientInfoCard({ patient, portal = 'hospital' }: PatientInfoCar
   const displayName = patient.name || patient.patient_id;
   const displayAge = patient.age > 0 ? String(patient.age) : 'Not on record';
   const displayGender = patient.gender && patient.gender !== 'Unknown' ? patient.gender : 'Not on record';
+  const displayDob = patient.dob || 'Not on record';
+  const displayRelationship = patient.relationship || 'Not on record';
+  const displayContact = patient.contact || 'Not on record';
+  const displayAddress = patient.address || 'Not on record';
+  const displayPolicyHolder = patient.policy_holder || displayName;
 
   // V1 claim versions are immutable and the backend exposes no patient-update
   // contract, so Edit never mutates local state — it explains the real path
@@ -67,11 +72,12 @@ export function PatientInfoCard({ patient, portal = 'hospital' }: PatientInfoCar
       <div className="px-5 py-3">
         <Row label="Name"          value={displayName} />
         <Row label="Age / Gender"  value={`${displayAge} / ${displayGender}`} />
+        <Row label="DOB"           value={displayDob} />
         <Row label="Policy No."    value={patient.patient_id} mono />
-        <Row label="Policy Holder" value={displayName} />
-        <Row label="Relationship"  value="Not on record" />
-        <Row label="Contact"       value="Not on record" />
-        <Row label="Address"       value="Not on record" />
+        <Row label="Policy Holder" value={displayPolicyHolder} />
+        <Row label="Relationship"  value={displayRelationship} />
+        <Row label="Contact"       value={displayContact} />
+        <Row label="Address"       value={displayAddress} />
       </div>
     </div>
   );

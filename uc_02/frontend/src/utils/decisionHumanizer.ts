@@ -12,6 +12,10 @@ export interface DecisionLike {
   reason_code?: string | null;
   reasoning?: string[];
   requested_information?: string[];
+  criteria_results?: Record<string, boolean>;
+  criteria_evaluations?: Record<string, any>;
+  referenced_evidence_ids?: string[];
+  criterion_assessments?: Record<string, any>;
 }
 
 function prettyReasonCode(code?: string | null): string {
@@ -57,9 +61,57 @@ export function humanizeDecision(decision: DecisionLike | null | undefined): str
     case 'MORE_INFORMATION':
       return `Additional information is required before a decision can be made` +
         (missingList ? `: ${missingList}.` : '.');
-    case 'HUMAN_REVIEW':
-      return `Automated evaluation could not reach a safe conclusion${reason ? ` (${reason})` : ''}. ` +
-        'The claim was routed to human review.';
+    case 'HUMAN_REVIEW': {
+      const lines: string[] = [];
+      lines.push(`DECISION: Escalated to Human Review`);
+      lines.push(`REASON CODE: ${decision.reason_code || 'UNCERTAIN_CONCLUSIVENESS'}`);
+      
+      // Criteria status
+      const criteriaStates: string[] = [];
+      const evals = decision.criteria_evaluations || {};
+      const results = decision.criteria_results || {};
+      for (const [critId, evalObj] of Object.entries(evals)) {
+        const critName = evalObj.criterion_name || evalObj.name || critId;
+        const passed = results[critId] === true;
+        criteriaStates.push(`- ${critId}: ${critName} (${passed ? 'PASSED' : 'NOT MET / UNCERTAIN'})`);
+      }
+      if (criteriaStates.length > 0) {
+        lines.push(`CRITERIA STATUS:\n${criteriaStates.join('\n')}`);
+      } else {
+        lines.push(`CRITERIA STATUS: Incomplete or uncertain criteria validation.`);
+      }
+      
+      // Supporting evidence IDs
+      const evidenceIds = decision.referenced_evidence_ids || [];
+      lines.push(`SUPPORTING EVIDENCE: ${evidenceIds.length > 0 ? evidenceIds.join(', ') : 'None referenced'}`);
+      
+      // Missing / uncertain information
+      lines.push(`MISSING/UNCERTAIN INFORMATION: ${missing.length > 0 ? missing.join('; ') : 'None outstanding'}`);
+      
+      // Why automation stopped
+      let stoppedWhy = 'Automation stopped because the clinical criteria could not be definitively validated with the available evidence.';
+      if (decision.reason_code === 'SENSITIVE_DATA_BLOCKED') {
+        stoppedWhy = 'Automation stopped because sensitive clinical data release consent was declined or blocked.';
+      } else if (decision.reason_code === 'PIPELINE_FAIL_CLOSED') {
+        stoppedWhy = 'Automation stopped because the RAG decision pipeline failed closed on error.';
+      } else if (decision.reason_code === 'NO_MATCHING_POLICY') {
+        stoppedWhy = 'Automation stopped because no compatible active policy was found for the requested procedure.';
+      } else if (missing.length > 0) {
+        stoppedWhy = 'Automation stopped because key required evidence items are missing and need provider resubmission.';
+      }
+      lines.push(`WHY AUTOMATION STOPPED: ${stoppedWhy}`);
+      
+      // What the human should review/do
+      let humanAction = 'The human reviewer should review the clinical documents, verify the diagnostic criteria, and manually determine prior authorization status.';
+      if (decision.reason_code === 'SENSITIVE_DATA_BLOCKED') {
+        humanAction = 'The reviewer should contact the provider to obtain manual authorization or release consent for the requested clinical documents.';
+      } else if (missing.length > 0) {
+        humanAction = 'The reviewer should verify if the provider has resubmitted the missing documentation and re-trigger evaluation.';
+      }
+      lines.push(`RECOMMENDED REVIEWER ACTION: ${humanAction}`);
+      
+      return lines.join('\n\n');
+    }
     default:
       break;
   }

@@ -8,6 +8,7 @@ import {
   stopSimulation,
   resetSimulation,
   resimulateSimulation,
+  listSimulations,
 } from '../../services/simulationApi';
 import type { SimulationStatus } from '../../services/simulationApi';
 import type { Claim, ClaimDetails } from '../../types/claim';
@@ -27,12 +28,17 @@ export function HospitalDashboard() {
   const [loading, setLoading] = useState(true);
   const [simStatus, setSimStatus] = useState<SimulationStatus | null>(null);
   const [simActionBusy, setSimActionBusy] = useState(false);
+  const [allSims, setAllSims] = useState<any[]>([]);
+  const [selectedResetId, setSelectedResetId] = useState<string>('');
 
   const fetchData = (showLoading = true) => {
     if (showLoading) setLoading(true);
     getSimulationStatus()
       .then(setSimStatus)
       .catch(() => setSimStatus(null));
+    listSimulations()
+      .then(setAllSims)
+      .catch(() => {});
     getClaims().then(async (data) => {
       setClaims(data);
       const priority = data.filter(c => ['REJECTED', 'MORE_INFO', 'HUMAN_REVIEW'].includes(c.status));
@@ -99,6 +105,14 @@ export function HospitalDashboard() {
   };
   const handleStopSimulation = () => runSimAction(() => stopSimulation());
   const handleResetSimulation = () => runSimAction(() => resetSimulation());
+  const handleResetSelectedSimulation = () => {
+    if (!selectedResetId) {
+      alert('Please select a simulation run to reset.');
+      return;
+    }
+    runSimAction(() => resetSimulation(selectedResetId));
+    setSelectedResetId('');
+  };
   const handleResimulate = () => {
     const simId = simStatus?.simulation_id;
     if (!simId) return;
@@ -316,9 +330,35 @@ export function HospitalDashboard() {
               disabled={simActionBusy}
               className="text-slate-600"
             >
-              <Square className="w-3.5 h-3.5 mr-1.5" /> Reset
+              <Square className="w-3.5 h-3.5 mr-1.5" /> Reset All
             </Button>
           </div>
+          {allSims.length > 0 && (
+            <div className="flex items-center gap-2 pt-3 border-t border-slate-100 w-full flex-wrap">
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Target Reset Run:</label>
+              <select
+                value={selectedResetId}
+                onChange={e => setSelectedResetId(e.target.value)}
+                className="text-xs border border-slate-355 rounded px-2.5 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono font-semibold"
+              >
+                <option value="">Select simulation run...</option>
+                {allSims.map((sim: any) => (
+                  <option key={sim.simulation_id} value={sim.simulation_id}>
+                    {sim.simulation_id} ({sim.status})
+                  </option>
+                ))}
+              </select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleResetSelectedSimulation}
+                disabled={simActionBusy || !selectedResetId}
+                className="text-red-750 border-red-200 hover:bg-red-50 bg-red-50/20"
+              >
+                Reset Selected Run
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
