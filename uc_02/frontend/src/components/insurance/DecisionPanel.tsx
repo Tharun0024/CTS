@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2, CheckCircle2, XCircle, AlertTriangle, Users, Info } from 'lucide-react';
 import { submitDecision } from '../../services/insuranceApi';
+import { decisionLabel } from '../../utils/decisionHumanizer';
 import type { DecisionStatus, DecisionPayload } from '../../types/claim';
 import { clsx } from 'clsx';
 
@@ -74,7 +75,7 @@ export function DecisionPanel({ claimId, recommendation, reason, onDecisionMade 
       <div className={clsx('rounded-lg border-2 p-4 text-center animate-fade-in-up', def?.border ?? '')}>
         <Icon className={clsx('w-8 h-8 mx-auto mb-2', def?.color)} />
         <p className="text-xs font-bold text-slate-900">Decision Submitted</p>
-        <p className={clsx('text-xs font-semibold mt-0.5', def?.color)}>{def?.label}</p>
+        <p className={clsx('text-xs font-semibold mt-0.5', def?.color)}>{decisionLabel(result)}</p>
         {comments && <p className="text-[11px] text-slate-500 mt-1.5 italic">"{comments}"</p>}
         <button
           onClick={() => { setStep('choose'); setSelected(null); setReasonCode(''); setComments(''); setResult(null); }}
@@ -98,7 +99,7 @@ export function DecisionPanel({ claimId, recommendation, reason, onDecisionMade 
           <div className="flex items-center justify-between">
             <span className="text-indigo-700 font-extrabold">Agent 1 Recommendation</span>
             <span className="font-extrabold text-indigo-900 bg-indigo-200/50 border border-indigo-200 px-2 py-0.5 rounded text-[10px]">
-              {recommendation === 'MORE_INFORMATION' ? 'NEED_MORE_INFO' : recommendation === 'ACCEPT' ? 'APPROVE' : recommendation === 'REJECT' ? 'DENY' : recommendation}
+              {decisionLabel(recommendation)}
             </span>
           </div>
           {reason && (

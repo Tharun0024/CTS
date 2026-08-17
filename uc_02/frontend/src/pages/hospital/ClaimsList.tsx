@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { ClaimsTable } from '../../components/hospital/ClaimsTable';
 import { LoadingState } from '../../components/common/LoadingState';
@@ -11,6 +11,9 @@ import { Button } from '../../components/ui/Button';
 
 export function ClaimsList() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Header search navigates here with ?q=<term> to pre-filter the real list.
+  const initialQuery = searchParams.get('q') ?? '';
   const [claims, setClaims]   = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
@@ -57,7 +60,7 @@ export function ClaimsList() {
       </div>
       {loading ? <LoadingState message="Loading claims…" /> :
        error   ? <ErrorState message={error} onRetry={fetchData} /> :
-       <ClaimsTable claims={claims} portal="hospital" />}
+       <ClaimsTable claims={claims} portal="hospital" initialQuery={initialQuery} />}
     </div>
   );
 }

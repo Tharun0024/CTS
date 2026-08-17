@@ -1,6 +1,8 @@
 import { Search, Bell, Menu, ChevronDown, LogOut, Settings, Home } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { getNotifications } from '../../services/notificationsApi';
+import { getClaims } from '../../services/claimsApi';
 
 interface HospitalHeaderProps {
   setIsMobileOpen: (open: boolean) => void;
@@ -25,7 +27,8 @@ function getBreadcrumb(pathname: string): string {
 
 export function HospitalHeader({ setIsMobileOpen, isCollapsed, setIsCollapsed }: HospitalHeaderProps) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [notifCount] = useState(3);
+  // Real unread count of alarming events derived from the live claim dataset.
+  const [notifCount, setNotifCount] = useState(0);
   const [searchVal, setSearchVal] = useState('');
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -40,6 +43,18 @@ export function HospitalHeader({ setIsMobileOpen, isCollapsed, setIsCollapsed }:
       setUser(JSON.parse(storedUser));
     }
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      getNotifications()
+        .then(n => { if (active) setNotifCount(n.filter(x => !x.read).length); })
+        .catch(() => { /* header badge is best-effort */ });
+    };
+    refresh();
+    const timer = setInterval(refresh, 30000);
+    return () => { active = false; clearInterval(timer); };
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -59,16 +74,27 @@ export function HospitalHeader({ setIsMobileOpen, isCollapsed, setIsCollapsed }:
     return name.slice(0, 2).toUpperCase();
   };
 
-  const handleSearch = () => {
-    if (!searchVal.trim()) return;
-    let cleanVal = searchVal.trim().toUpperCase();
-    if (/^\d+$/.test(cleanVal)) {
-      cleanVal = `CLM-${cleanVal.padStart(3, '0')}`;
-    } else if (/^CLM\d+$/.test(cleanVal)) {
-      cleanVal = `CLM-${cleanVal.slice(3)}`;
-    }
-    navigate(`/hospital/claims/${cleanVal}`);
+  // Searches the REAL loaded claim dataset (claim id / patient id /
+  // procedure). A single match opens that claim; otherwise the claim list is
+  // opened with the query pre-applied. No IDs are ever fabricated.
+  const handleSearch = async () => {
+    const term = searchVal.trim();
+    if (!term) return;
     setSearchVal('');
+    const lower = term.toLowerCase();
+    try {
+      const claims = await getClaims();
+      const exact = claims.find(c => c.claim_id.toLowerCase() === lower);
+      if (exact) { navigate(`/hospital/claims/${exact.claim_id}`); return; }
+      const matches = claims.filter(c =>
+        c.claim_id.toLowerCase().includes(lower) ||
+        c.patient_id.toLowerCase().includes(lower) ||
+        c.procedure.toLowerCase().includes(lower));
+      if (matches.length === 1) { navigate(`/hospital/claims/${matches[0].claim_id}`); return; }
+      navigate(`/hospital/claims?q=${encodeURIComponent(term)}`);
+    } catch {
+      navigate(`/hospital/claims?q=${encodeURIComponent(term)}`);
+    }
   };
 
   return (

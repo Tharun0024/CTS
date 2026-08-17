@@ -48,6 +48,8 @@ export interface Claim {
   diagnosis_codes: string[];
   service_date: string;
   provider_id?: string;
+  payer?: string;
+  policy_id?: string;
   status: ClaimStatus;
   attempt?: number;
   submission_history?: SubmissionAttempt[];
@@ -221,12 +223,23 @@ export interface ReviewDetails extends ReviewItem {
   ai_confidence: number;
 }
 
-// Notification
+// Notification (derived client-side from real claim records; no backend
+// notifications endpoint exists in V1). Alarming events only — REJECT,
+// HUMAN_REVIEW, REQUEST_MORE_INFORMATION, provider decline, failed recovery.
+export type NotificationType =
+  | 'DECISION'
+  | 'HUMAN_REVIEW'
+  | 'MORE_INFO'
+  | 'PROVIDER_DECLINE'
+  | 'RECOVERY_FAILED'
+  | 'STATUS_CHANGE'
+  | 'RESUBMISSION';
+
 export interface Notification {
   notification_id: string;
   claim_id: string;
   message: string;
-  type: 'STATUS_CHANGE' | 'DECISION' | 'MORE_INFO' | 'RESUBMISSION';
+  type: NotificationType;
   read: boolean;
   created_at: string;
 }

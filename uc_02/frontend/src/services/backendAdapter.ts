@@ -15,6 +15,7 @@ import type {
   ResubmissionStatus,
   TimelineEvent,
 } from '../types/claim';
+import { humanizeDecision } from '../utils/decisionHumanizer';
 
 // ---------------------------------------------------------------------------
 // Backend payload shapes (as serialized by api/claims/mapping.py)
@@ -339,7 +340,9 @@ export function toClaimDetails(record: BackendRecord): ClaimDetails {
     decision: decision
       ? {
           status: (decision.status ?? decision.outcome ?? 'HUMAN_REVIEW') as DecisionStatus,
-          reason: (decision.reasoning ?? []).join(' ') || decision.reason_code || 'No reasoning recorded.',
+          // Raw backend trace is converted to a concise human-readable
+          // explanation here (gap 7); status/reason_code are preserved as-is.
+          reason: humanizeDecision(decision),
           reason_code: decision.reason_code ?? undefined,
         }
       : null,
@@ -388,7 +391,7 @@ export function toClaimDetails(record: BackendRecord): ClaimDetails {
       decision: version.decision
         ? {
             status: (version.decision.status ?? 'HUMAN_REVIEW') as DecisionStatus,
-            reason: (version.decision.reasoning ?? []).join(' '),
+            reason: humanizeDecision(version.decision),
             reason_code: version.decision.reason_code ?? undefined,
             outcome: version.decision.outcome,
           }
@@ -415,6 +418,8 @@ export function toClaimSummary(summary: BackendSummary): Claim {
     procedure_code: summary.procedure_code ?? 'N/A',
     diagnosis_codes: summary.diagnosis_codes ?? [],
     service_date: summary.service_date ?? summary.updated_at ?? '',
+    payer: summary.payer ?? undefined,
+    policy_id: summary.policy_id ?? undefined,
     status,
     attempt: Math.max(summary.claim_version ?? 1, 1),
     evidence_request_status: undefined,

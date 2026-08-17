@@ -8,16 +8,22 @@ import { Bell, CheckCheck } from 'lucide-react';
 import { clsx } from 'clsx';
 
 const TYPE_STYLES: Record<string, string> = {
-  DECISION:      'bg-brand-50 border-brand-200',
-  MORE_INFO:     'bg-amber-50 border-amber-200',
-  STATUS_CHANGE: 'bg-slate-50 border-slate-200',
-  RESUBMISSION:  'bg-purple-50 border-purple-200',
+  DECISION:         'bg-rose-50 border-rose-200',
+  PROVIDER_DECLINE: 'bg-rose-50 border-rose-200',
+  RECOVERY_FAILED:  'bg-rose-50 border-rose-200',
+  HUMAN_REVIEW:     'bg-brand-50 border-brand-200',
+  MORE_INFO:        'bg-amber-50 border-amber-200',
+  STATUS_CHANGE:    'bg-slate-50 border-slate-200',
+  RESUBMISSION:     'bg-purple-50 border-purple-200',
 };
 const TYPE_DOT: Record<string, string> = {
-  DECISION:      'bg-brand-500',
-  MORE_INFO:     'bg-amber-500',
-  STATUS_CHANGE: 'bg-slate-400',
-  RESUBMISSION:  'bg-purple-500',
+  DECISION:         'bg-rose-500',
+  PROVIDER_DECLINE: 'bg-rose-500',
+  RECOVERY_FAILED:  'bg-rose-500',
+  HUMAN_REVIEW:     'bg-brand-500',
+  MORE_INFO:        'bg-amber-500',
+  STATUS_CHANGE:    'bg-slate-400',
+  RESUBMISSION:     'bg-purple-500',
 };
 
 export function InsuranceNotifications() {

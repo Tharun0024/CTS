@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { IncomingClaimsTable } from '../../components/insurance/IncomingClaimsTable';
 import { LoadingState } from '../../components/common/LoadingState';
@@ -7,6 +8,9 @@ import { getInsuranceClaims } from '../../services/insuranceApi';
 import type { InsuranceClaim } from '../../types/claim';
 
 export function IncomingClaims() {
+  const [searchParams] = useSearchParams();
+  // Header search navigates here with ?q=<term> to pre-filter the real list.
+  const initialQuery = searchParams.get('q') ?? '';
   const [claims, setClaims]   = useState<InsuranceClaim[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
@@ -43,7 +47,7 @@ export function IncomingClaims() {
 
           {loading ? <LoadingState message="Loading claims…" /> :
            error   ? <ErrorState message={error} onRetry={fetchData} /> :
-           <IncomingClaimsTable claims={claims} />
+           <IncomingClaimsTable claims={claims} initialQuery={initialQuery} />
           }
 </div>
   );

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, CheckCircle2, AlertTriangle, Info, ShieldAlert, Check, Search } from 'lucide-react';
+import { Bell, AlertTriangle, Info, ShieldAlert, Check, Search, Users, XCircle } from 'lucide-react';
 import { getNotifications, markAsRead as apiMarkAsRead, markAllRead as apiMarkAllRead } from '../../services/notificationsApi';
 import type { Notification } from '../../types/claim';
 import { clsx } from 'clsx';
@@ -33,17 +33,24 @@ export function Notifications() {
 
   const filtered = notifications.filter(n => {
     const matchesSearch = n.message.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTab = activeTab === 'All' ? true : activeTab === 'Unread' ? !n.read : n.type === activeTab.toLowerCase();
+    let matchesTab = true;
+    if (activeTab === 'Unread') matchesTab = !n.read;
+    else if (activeTab === 'Denial') matchesTab = n.type === 'DECISION' || n.type === 'PROVIDER_DECLINE' || n.type === 'RECOVERY_FAILED';
+    else if (activeTab === 'Review') matchesTab = n.type === 'HUMAN_REVIEW';
+    else if (activeTab === 'More Info') matchesTab = n.type === 'MORE_INFO';
     return matchesSearch && matchesTab;
   });
 
+  // Icon config keyed by the real derived notification types (alarming
+  // events only — approvals never produce notifications).
   const getIconConfig = (type: string) => {
     switch (type) {
-      case 'approval': return { icon: CheckCircle2, bg: 'bg-emerald-100', color: 'text-emerald-600', border: 'border-emerald-200' };
-      case 'denial': return { icon: ShieldAlert, bg: 'bg-rose-100', color: 'text-rose-600', border: 'border-rose-200' };
-      case 'info': return { icon: Info, bg: 'bg-blue-100', color: 'text-blue-600', border: 'border-blue-200' };
-      case 'warning': return { icon: AlertTriangle, bg: 'bg-amber-100', color: 'text-amber-600', border: 'border-amber-200' };
-      default: return { icon: Bell, bg: 'bg-slate-100', color: 'text-slate-600', border: 'border-slate-200' };
+      case 'DECISION': return { icon: ShieldAlert, bg: 'bg-rose-100', color: 'text-rose-600', border: 'border-rose-200' };
+      case 'PROVIDER_DECLINE': return { icon: XCircle, bg: 'bg-rose-100', color: 'text-rose-600', border: 'border-rose-200' };
+      case 'RECOVERY_FAILED': return { icon: XCircle, bg: 'bg-rose-100', color: 'text-rose-600', border: 'border-rose-200' };
+      case 'HUMAN_REVIEW': return { icon: Users, bg: 'bg-blue-100', color: 'text-blue-600', border: 'border-blue-200' };
+      case 'MORE_INFO': return { icon: AlertTriangle, bg: 'bg-amber-100', color: 'text-amber-600', border: 'border-amber-200' };
+      default: return { icon: Info, bg: 'bg-slate-100', color: 'text-slate-600', border: 'border-slate-200' };
     }
   };
 
@@ -58,7 +65,7 @@ export function Notifications() {
             </div>
             Notifications Center
           </h1>
-          <p className="text-sm text-slate-500 font-medium mt-1">Real-time alerts for claims, authorizations, and system updates</p>
+          <p className="text-sm text-slate-500 font-medium mt-1">Alerts for denials, human review, information requests, and recovery failures</p>
         </div>
         <Button
           onClick={markAllRead}
@@ -72,7 +79,7 @@ export function Notifications() {
         {/* Toolbar */}
         <CardHeader className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between gap-4">
           <div className="flex overflow-x-auto no-scrollbar gap-1.5 p-1 bg-white border border-slate-200 rounded-xl">
-            {['All', 'Unread', 'Approval', 'Denial'].map(tab => (
+            {['All', 'Unread', 'Denial', 'Review', 'More Info'].map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}

@@ -12,9 +12,10 @@ import { LoadingState } from '../../components/common/LoadingState';
 import { ErrorState } from '../../components/common/ErrorState';
 
 import { getClaimDetails } from '../../services/claimsApi';
-import { viewPolicyDocument } from '../../utils/policyViewer';
+import { viewClaimPolicyContext } from '../../utils/policyViewer';
+import { decisionLabel } from '../../utils/decisionHumanizer';
 import { usePolling, isTerminalStatus } from '../../services/polling';
-import type { ClaimDetails } from '../../types/claim';
+import type { ClaimDetails, ClaimVersion } from '../../types/claim';
 import { CheckCircle2, AlertTriangle, Users, Loader2, Shield, Clock } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
@@ -63,9 +64,9 @@ export function HospitalClaimDetails() {
     PROCESSING: { icon: Loader2, title: 'Processing Claim', msg: 'Extracting data and running policy analysis… This page updates automatically.', cls: 'bg-violet-50 border-violet-200', iconCls: 'text-violet-600' },
     SUBMITTED: { icon: Loader2, title: 'Claim Received', msg: 'Processing documents… Average wait: 2–3 minutes.', cls: 'bg-violet-50 border-violet-200', iconCls: 'text-violet-600' },
     UNDER_REVIEW: { icon: Loader2, title: 'Under Review', msg: 'Policy criteria under review…', cls: 'bg-violet-50 border-violet-200', iconCls: 'text-violet-600' },
-    ACCEPTED: { icon: CheckCircle2, title: 'Claim Accepted', msg: claim.decision?.reason || '', cls: 'bg-emerald-50 border-emerald-200', iconCls: 'text-emerald-600' },
-    MORE_INFO: { icon: AlertTriangle, title: 'Additional Information Required', msg: claim.decision?.reason || '', cls: 'bg-amber-50 border-amber-200', iconCls: 'text-amber-600' },
-    HUMAN_REVIEW: { icon: Users, title: 'Human Review Required', msg: claim.decision?.reason || '', cls: 'bg-blue-50 border-blue-200', iconCls: 'text-blue-600' },
+    ACCEPTED: { icon: CheckCircle2, title: 'APPROVE', msg: claim.decision?.reason || '', cls: 'bg-emerald-50 border-emerald-200', iconCls: 'text-emerald-600' },
+    MORE_INFO: { icon: AlertTriangle, title: 'REQUEST MORE INFORMATION', msg: claim.decision?.reason || '', cls: 'bg-amber-50 border-amber-200', iconCls: 'text-amber-600' },
+    HUMAN_REVIEW: { icon: Users, title: 'HUMAN REVIEW', msg: claim.decision?.reason || '', cls: 'bg-blue-50 border-blue-200', iconCls: 'text-blue-600' },
     RESUBMISSION_CHECK: { icon: Shield, title: 'Resubmission Under Analysis', msg: 'Checking all criteria for resubmission eligibility…', cls: 'bg-indigo-50 border-indigo-200', iconCls: 'text-indigo-600' },
     SUBMITTED_AGAIN: { icon: CheckCircle2, title: 'Claim Resubmitted', msg: 'Awaiting review by the insurer.', cls: 'bg-sky-50 border-sky-200', iconCls: 'text-sky-600' },
   };
@@ -73,8 +74,27 @@ export function HospitalClaimDetails() {
   const banner = banners[claim.status];
   const BannerIcon = banner?.icon;
   const isSpinning = ['PROCESSING', 'SUBMITTED', 'UNDER_REVIEW'].includes(claim.status);
+
+  // Gap 3: attempts driven by the real backend versions (V1/V2 + decisions).
+  const versionsForView: ClaimVersion[] = (claim.versions && claim.versions.length > 0)
+    ? claim.versions
+    : [{
+        version: 'V1',
+        attempt: 1,
+        decision: claim.decision
+          ? { status: claim.decision.status, reason: claim.decision.reason, reason_code: claim.decision.reason_code }
+          : null,
+      }];
+  const versionStatusCls: Record<string, string> = {
+    ACCEPT: 'text-emerald-600',
+    REJECT: 'text-red-600',
+    MORE_INFORMATION: 'text-amber-600',
+    HUMAN_REVIEW: 'text-blue-600',
+  };
+
   const handleViewPolicyDetails = () => {
-    viewPolicyDocument(claim.policy.policy_id, claim.policy.policy_name, claim.policy.payer);
+    // Real policy context rendered from the live claim record (gap 6).
+    viewClaimPolicyContext(claim);
   };
 
   return (
@@ -222,46 +242,44 @@ export function HospitalClaimDetails() {
                 </div>
               )}
 
-              {/* 4. Attempt / Resubmission visual timeline */}
+              {/* 4. Attempt / Resubmission visual timeline — real versions */}
               <div className="border-t border-slate-100 pt-4 space-y-3">
                 <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-wider">Submissions & Attempts</h4>
 
                 <div className="flex flex-col sm:flex-row items-stretch gap-4 justify-between">
-                  {/* Attempt 1 block */}
-                  <div className="flex-1 bg-slate-50/50 border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-bold text-slate-900">Attempt 1</span>
-                        <span className="text-[10px] font-bold text-slate-500">Submitted</span>
+                  {versionsForView.map((v, idx) => {
+                    const attemptNo = v.attempt ?? idx + 1;
+                    const delta = v.new_evidence_delta ?? [];
+                    return (
+                      <div key={`${v.version}-${attemptNo}`} className="flex-1 bg-slate-50/50 border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-bold text-slate-900">Attempt {attemptNo} · {v.version}</span>
+                            <span className="text-[10px] font-bold text-slate-500">{idx === versionsForView.length - 1 ? 'Latest' : 'Completed'}</span>
+                          </div>
+                          <div className="flex flex-col items-center py-2 text-center text-xs space-y-1 bg-white border border-slate-150 rounded-lg p-2.5">
+                            {v.decision ? (
+                              <>
+                                <span className={clsx('font-extrabold font-mono text-[10px]', versionStatusCls[v.decision.status] ?? 'text-slate-600')}>
+                                  {decisionLabel(v.decision.status)}
+                                </span>
+                                <span className="text-slate-400 text-[10px]">↓</span>
+                                <span className="font-medium text-slate-600 text-[10px] leading-snug">{v.decision.reason}</span>
+                              </>
+                            ) : (
+                              <span className="font-semibold text-slate-500">Decision pending…</span>
+                            )}
+                            {delta.length > 0 && (
+                              <span className="font-semibold text-emerald-700 text-[10px]">+{delta.length} new evidence item(s)</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex flex-col items-center py-2 text-center text-xs space-y-1 bg-white border border-slate-150 rounded-lg p-2.5">
-                        <span className="font-semibold text-slate-500">Attempt 1</span>
-                        <span className="text-slate-400 text-[10px]">↓</span>
-                        <span className="font-extrabold text-amber-600 font-mono text-[10px]">NEED_MORE_INFO</span>
-                        <span className="text-slate-400 text-[10px]">↓</span>
-                        <span className="font-semibold text-slate-700 text-[10px]">Evidence Requested</span>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })}
 
-                  {/* Attempt 2 block */}
-                  {((claim.attempt ?? 1) >= 2 || claim.status === 'SUBMITTED_AGAIN' || claim.resubmission_status === 'RESUBMITTED') ? (
-                    <div className="flex-1 bg-slate-50/50 border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-xs font-bold text-slate-900">Attempt 2</span>
-                          <span className="text-[10px] font-bold text-emerald-600">Active</span>
-                        </div>
-                        <div className="flex flex-col items-center py-2 text-center text-xs space-y-1 bg-white border border-slate-150 rounded-lg p-2.5">
-                          <span className="font-semibold text-slate-500">Attempt 2</span>
-                          <span className="text-slate-400 text-[10px]">↓</span>
-                          <span className="font-semibold text-slate-700 text-[10px]">New Evidence Added</span>
-                          <span className="text-slate-400 text-[10px]">↓</span>
-                          <span className="font-extrabold text-emerald-600 font-mono text-[10px]">Submitted for Re-evaluation</span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
+                  {/* Next attempt placeholder until a resubmission exists */}
+                  {(claim.attempt ?? 1) < 2 && versionsForView.length < 2 && (
                     <div className="flex-1 border border-dashed border-slate-200 rounded-xl p-3 flex items-center justify-center text-center">
                       <div>
                         <span className="text-xs font-bold text-slate-400 block">Attempt 2</span>
@@ -277,7 +295,7 @@ export function HospitalClaimDetails() {
           </Card>
 
           {claim.policy_evidence.length > 0 && (
-            <PolicyEvidencePanel evidence={claim.policy_evidence} policyName={claim.policy.policy_name} policyId={claim.policy.policy_id} portal="hospital" />
+            <PolicyEvidencePanel evidence={claim.policy_evidence} policyName={claim.policy.policy_name} policyId={claim.policy.policy_id} portal="hospital" onViewPolicy={handleViewPolicyDetails} />
           )}
 
           {claim.status === 'MORE_INFO' && claim.missing_information.length > 0 && (
@@ -315,13 +333,14 @@ export function HospitalClaimDetails() {
             </CardHeader>
             <CardContent className="px-5 py-4 space-y-3">
               {[
-                { label: 'Policy Plan', value: `${claim.policy.payer} Secure Plus`, accent: false },
-                { label: 'Start Date', value: 'Jan 01, 2025', accent: false },
-                { label: 'End Date', value: 'Dec 31, 2025', accent: false },
+                { label: 'Payer', value: claim.policy.payer },
+                { label: 'Policy ID', value: claim.policy.policy_id },
+                { label: 'Policy Name', value: claim.policy.policy_name },
+                { label: 'Procedure Code', value: claim.claim.procedure_code },
               ].map(r => (
                 <div key={r.label} className="flex items-baseline justify-between border-b border-slate-50 pb-2 last:border-0 last:pb-0">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{r.label}</span>
-                  <span className={clsx('text-[13px] font-bold', r.accent ? 'text-emerald-700' : 'text-slate-800')}>{r.value}</span>
+                  <span className="text-[13px] font-bold text-slate-800">{r.value || 'N/A'}</span>
                 </div>
               ))}
               <button

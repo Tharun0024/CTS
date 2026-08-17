@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { User, Edit2 } from 'lucide-react';
+import { useState } from 'react';
+import { User, Edit2, Lock } from 'lucide-react';
 import type { ClaimDetails } from '../../types/claim';
 import { clsx } from 'clsx';
 
@@ -20,53 +20,19 @@ export function PatientInfoCard({ patient, portal = 'hospital' }: PatientInfoCar
   const accentBg   = isHospital ? 'bg-emerald-50' : 'bg-indigo-50';
   const accentIcon = isHospital ? 'text-emerald-600' : 'text-indigo-600';
   const editColor  = isHospital ? 'text-emerald-600 hover:text-emerald-800' : 'text-indigo-600 hover:text-indigo-800';
-  const [editablePatient, setEditablePatient] = useState({
-    name: patient.name || 'Ramesh Kumar',
-    age: patient.age || 46,
-    gender: patient.gender || 'Male',
-    contact: '98765 43210',
-    address: 'Coimbatore, Tamil Nadu',
-  });
+  const [notice, setNotice] = useState(false);
 
-  useEffect(() => {
-    setEditablePatient({
-      name: patient.name || 'Ramesh Kumar',
-      age: patient.age || 46,
-      gender: patient.gender || 'Male',
-      contact: '98765 43210',
-      address: 'Coimbatore, Tamil Nadu',
-    });
-  }, [patient]);
+  // Display values come ONLY from the real backend claim record. Fields with
+  // no backend source are shown honestly as "Not on record".
+  const displayName = patient.name || patient.patient_id;
+  const displayAge = patient.age > 0 ? String(patient.age) : 'Not on record';
+  const displayGender = patient.gender && patient.gender !== 'Unknown' ? patient.gender : 'Not on record';
 
+  // V1 claim versions are immutable and the backend exposes no patient-update
+  // contract, so Edit never mutates local state — it explains the real path
+  // (additional documentation via the claim's missing-information upload).
   const handleEdit = () => {
-    const nextName = window.prompt('Patient name', editablePatient.name);
-    if (nextName === null) return;
-
-    const nextAgeRaw = window.prompt('Patient age', String(editablePatient.age));
-    if (nextAgeRaw === null) return;
-
-    const parsedAge = Number.parseInt(nextAgeRaw, 10);
-    if (!Number.isFinite(parsedAge) || parsedAge <= 0) {
-      alert('Please enter a valid age.');
-      return;
-    }
-
-    const nextGender = window.prompt('Patient gender', editablePatient.gender);
-    if (nextGender === null) return;
-
-    const nextContact = window.prompt('Contact number', editablePatient.contact);
-    if (nextContact === null) return;
-
-    const nextAddress = window.prompt('Address', editablePatient.address);
-    if (nextAddress === null) return;
-
-    setEditablePatient({
-      name: nextName.trim() || editablePatient.name,
-      age: parsedAge,
-      gender: nextGender.trim() || editablePatient.gender,
-      contact: nextContact.trim() || editablePatient.contact,
-      address: nextAddress.trim() || editablePatient.address,
-    });
+    setNotice(v => !v);
   };
 
   return (
@@ -87,15 +53,25 @@ export function PatientInfoCard({ patient, portal = 'hospital' }: PatientInfoCar
           <Edit2 className="w-3 h-3" /> Edit
         </button>
       </div>
+      {notice && (
+        <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-100 flex items-start gap-2">
+          <Lock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5" />
+          <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+            Patient details are locked to the submitted claim record — V1 claim versions are immutable and the
+            backend provides no patient-field update contract. To add supporting information, use the
+            Missing Information upload on this claim (the only real write path).
+          </p>
+        </div>
+      )}
       {/* Rows */}
       <div className="px-5 py-3">
-        <Row label="Name"          value={editablePatient.name} />
-        <Row label="Age / Gender"  value={`${editablePatient.age} / ${editablePatient.gender}`} />
+        <Row label="Name"          value={displayName} />
+        <Row label="Age / Gender"  value={`${displayAge} / ${displayGender}`} />
         <Row label="Policy No."    value={patient.patient_id} mono />
-        <Row label="Policy Holder" value={editablePatient.name} />
-        <Row label="Relationship"  value="Self" />
-        <Row label="Contact"       value={editablePatient.contact} />
-        <Row label="Address"       value={editablePatient.address} />
+        <Row label="Policy Holder" value={displayName} />
+        <Row label="Relationship"  value="Not on record" />
+        <Row label="Contact"       value="Not on record" />
+        <Row label="Address"       value="Not on record" />
       </div>
     </div>
   );

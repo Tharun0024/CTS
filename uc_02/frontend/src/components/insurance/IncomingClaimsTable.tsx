@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { StatusBadge } from '../common/StatusBadge';
 import { EmptyState } from '../common/EmptyState';
 import { clsx } from 'clsx';
 import type { InsuranceClaim, ClaimStatus } from '../../types/claim';
+import { Search } from 'lucide-react';
 
 const FILTERS: { label: string; value: ClaimStatus | 'ALL' }[] = [
   { label: 'All',          value: 'ALL' },
@@ -25,13 +26,27 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 interface IncomingClaimsTableProps {
   claims: InsuranceClaim[];
+  // Optional pre-applied search term (e.g. from the header search ?q= param).
+  initialQuery?: string;
 }
 
-export function IncomingClaimsTable({ claims }: IncomingClaimsTableProps) {
+export function IncomingClaimsTable({ claims, initialQuery }: IncomingClaimsTableProps) {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState<ClaimStatus | 'ALL'>('ALL');
+  const [query, setQuery] = useState(initialQuery ?? '');
 
-  const filtered = activeFilter === 'ALL' ? claims : claims.filter(c => c.status === activeFilter);
+  // Keep the filter in sync when a new header search navigates here.
+  useEffect(() => {
+    setQuery(initialQuery ?? '');
+  }, [initialQuery]);
+
+  const byFilter = activeFilter === 'ALL' ? claims : claims.filter(c => c.status === activeFilter);
+  const filtered = query
+    ? byFilter.filter(c =>
+        c.claim_id.toLowerCase().includes(query.toLowerCase()) ||
+        c.procedure.toLowerCase().includes(query.toLowerCase()) ||
+        c.patient_id.toLowerCase().includes(query.toLowerCase()))
+    : byFilter;
 
   return (
     <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm animate-fade-in-up">
@@ -56,6 +71,19 @@ export function IncomingClaimsTable({ claims }: IncomingClaimsTableProps) {
             )}
           </button>
         ))}
+      </div>
+
+      {/* Search bar */}
+      <div className="px-4 py-3 border-b border-slate-100 bg-white">
+        <div className="relative w-full md:w-96">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Filter by claim ID, procedure, or patient…"
+            className="pl-9 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all placeholder:text-slate-400"
+          />
+        </div>
       </div>
 
       {filtered.length === 0 ? (

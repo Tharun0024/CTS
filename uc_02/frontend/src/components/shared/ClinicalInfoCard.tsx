@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Stethoscope, Edit2 } from 'lucide-react';
+import { useState } from 'react';
+import { Stethoscope, Edit2, Lock } from 'lucide-react';
 import type { ClaimDetails } from '../../types/claim';
 import { clsx } from 'clsx';
 
@@ -25,26 +25,18 @@ export function ClinicalInfoCard({ claim, portal = 'hospital' }: ClinicalInfoCar
   const accentIcon = isHospital ? 'text-emerald-600' : 'text-indigo-600';
   const editColor = isHospital ? 'text-emerald-600 hover:text-emerald-800' : 'text-indigo-600 hover:text-indigo-800';
 
-  const [procedure, setProcedure] = useState(claim.procedure || 'Total Knee Replacement');
-  const [code, setCode] = useState(claim.procedure_code || '27447');
-  const [doctor, setDoctor] = useState('Dr. Arjun Prasad');
+  const [notice, setNotice] = useState(false);
 
-  useEffect(() => {
-    setProcedure(claim.procedure || 'Total Knee Replacement');
-    setCode(claim.procedure_code || '27447');
-  }, [claim]);
+  // All values come from the real backend claim record; no fabricated
+  // defaults. Fields without a backend source are shown honestly.
+  const procedure = claim.procedure || 'Unspecified procedure';
+  const code = claim.procedure_code || 'N/A';
+  const doctor = claim.provider_id || 'Not on record';
 
+  // V1 claim versions are immutable and there is no backend update contract
+  // for clinical fields, so Edit never mutates state — it surfaces the lock.
   const handleEdit = () => {
-    const nextProc = window.prompt('Edit Procedure Name:', procedure);
-    if (nextProc === null) return;
-    const nextCode = window.prompt('Edit Procedure Code:', code);
-    if (nextCode === null) return;
-    const nextDoc = window.prompt('Edit Treating Doctor:', doctor);
-    if (nextDoc === null) return;
-
-    setProcedure(nextProc.trim() || procedure);
-    setCode(nextCode.trim() || code);
-    setDoctor(nextDoc.trim() || doctor);
+    setNotice(v => !v);
   };
 
   return (
@@ -64,13 +56,22 @@ export function ClinicalInfoCard({ claim, portal = 'hospital' }: ClinicalInfoCar
           <Edit2 className="w-3 h-3" /> Edit
         </button>
       </div>
+      {notice && (
+        <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-100 flex items-start gap-2">
+          <Lock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5" />
+          <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+            Clinical details are locked to the submitted claim record — V1 claim versions are immutable and the
+            backend provides no clinical-field update contract. Additional clinical documentation can be submitted
+            through the claim's Missing Information upload (the only real write path).
+          </p>
+        </div>
+      )}
       <div className="px-5 py-3">
-        <Row label="Diagnosis" value={procedure} highlight />
-        <Row label="ICD Code" value={code} mono />
+        <Row label="Diagnosis" value={claim.diagnosis_codes.length > 0 ? claim.diagnosis_codes.join(', ') : 'Not on record'} highlight />
+        <Row label="Code" value={code} mono />
         <Row label="Treatment" value={procedure} />
-        <Row label="Admission Date" value={new Date(claim.service_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} />
-        <Row label="Discharge Date" value={new Date(claim.service_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} />
-        <Row label="Hospital" value="Sunrise Hospital" />
+        <Row label="Service Date" value={claim.service_date ? new Date(claim.service_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not on record'} />
+        <Row label="Hospital" value="City General Hospital" />
         <Row label="Treating Doctor" value={doctor} highlight />
       </div>
     </div>

@@ -7,9 +7,10 @@ import { DecisionPanel } from '../../components/insurance/DecisionPanel';
 import { LoadingState } from '../../components/common/LoadingState';
 import { ErrorState } from '../../components/common/ErrorState';
 import { getInsuranceClaimDetails } from '../../services/insuranceApi';
-import { viewPolicyDocument } from '../../utils/policyViewer';
+import { viewClaimPolicyContext } from '../../utils/policyViewer';
+import { decisionLabel } from '../../utils/decisionHumanizer';
 import { usePolling, isTerminalStatus } from '../../services/polling';
-import type { ClaimDetails, DecisionStatus } from '../../types/claim';
+import type { ClaimDetails, ClaimVersion, DecisionStatus } from '../../types/claim';
 import { Loader2, Shield } from 'lucide-react';
 
 export function InsuranceClaimDetails() {
@@ -55,6 +56,23 @@ export function InsuranceClaimDetails() {
   );
 
   const isProcessing = claim.status === 'PROCESSING' || claim.status === 'UNDER_REVIEW' || claim.status === 'SUBMITTED';
+
+  // Gap 3: resubmission history driven by the real backend versions.
+  const versionsForView: ClaimVersion[] = (claim.versions && claim.versions.length > 0)
+    ? claim.versions
+    : [{
+        version: 'V1',
+        attempt: 1,
+        decision: claim.decision
+          ? { status: claim.decision.status, reason: claim.decision.reason, reason_code: claim.decision.reason_code }
+          : null,
+      }];
+  const versionStatusCls: Record<string, string> = {
+    ACCEPT: 'text-emerald-700 bg-emerald-50 border-emerald-150',
+    REJECT: 'text-red-700 bg-red-50 border-red-150',
+    MORE_INFORMATION: 'text-amber-700 bg-amber-50 border-amber-150',
+    HUMAN_REVIEW: 'text-blue-700 bg-blue-50 border-blue-150',
+  };
 
   return (
     <div className="max-w-7xl mx-auto w-full pb-10">
@@ -146,32 +164,36 @@ export function InsuranceClaimDetails() {
               ) : null}
             </div>
 
-            {/* Resubmissions section showing Attempt 1 vs Attempt 2 */}
+            {/* Resubmission History — real backend versions (V1/V2) */}
             <div className="border-t border-slate-100 pt-3">
               <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Resubmission History</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Attempt 1 */}
-                <div className="border border-slate-150 rounded-xl p-3 bg-slate-50/50 flex flex-col justify-between text-xs">
-                  <div className="flex items-center justify-between font-bold text-slate-700 mb-1">
-                    <span>Attempt 1</span>
-                    <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-150 px-1.5 py-0.2 rounded font-semibold font-mono">NEED_MORE_INFO</span>
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1">First pass clinical policy checks resulted in additional details request.</p>
-                </div>
+                {versionsForView.map((v, idx) => {
+                  const attemptNo = v.attempt ?? idx + 1;
+                  const delta = v.new_evidence_delta ?? [];
+                  return (
+                    <div key={`${v.version}-${attemptNo}`} className="border border-slate-150 rounded-xl p-3 bg-slate-50/50 flex flex-col justify-between text-xs">
+                      <div className="flex items-center justify-between font-bold text-slate-700 mb-1">
+                        <span>Attempt {attemptNo} · {v.version}</span>
+                        {v.decision ? (
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold font-mono border ${versionStatusCls[v.decision.status] ?? 'text-slate-600 bg-slate-100 border-slate-200'}`}>
+                            {decisionLabel(v.decision.status)}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-slate-100 border border-slate-200 text-slate-500">PENDING</span>
+                        )}
+                      </div>
+                      {v.decision && (
+                        <p className="text-[10px] text-slate-500 mt-1 leading-snug">{v.decision.reason}</p>
+                      )}
+                      {delta.length > 0 && (
+                        <p className="text-[10px] font-semibold text-emerald-700 mt-1">+{delta.length} new evidence item(s)</p>
+                      )}
+                    </div>
+                  );
+                })}
 
-                {/* Attempt 2 */}
-                {((claim.attempt ?? 1) >= 2 || claim.status === 'SUBMITTED_AGAIN' || claim.resubmission_status === 'RESUBMITTED') ? (
-                  <div className="border border-emerald-150 rounded-xl p-3 bg-emerald-50/30 flex flex-col justify-between text-xs">
-                    <div className="flex items-center justify-between font-bold text-emerald-900 mb-1">
-                      <span>Attempt 2</span>
-                      <span className="text-[10px] text-emerald-700 bg-emerald-105 border border-emerald-200 px-1.5 py-0.2 rounded font-semibold">UNDER REVIEW</span>
-                    </div>
-                    <div className="text-[10px] text-emerald-800 font-medium mt-1">
-                      <span className="font-semibold text-emerald-900">Additional Evidence Received</span>
-                      <p className="text-slate-500 mt-0.5">Insurer re-evaluation loop active.</p>
-                    </div>
-                  </div>
-                ) : (
+                {(claim.attempt ?? 1) < 2 && versionsForView.length < 2 && (
                   <div className="border border-dashed border-slate-200 rounded-xl p-3 flex items-center justify-center text-center">
                     <span className="text-[10px] font-bold text-slate-400">Attempt 2 Awaiting Response</span>
                   </div>
@@ -187,6 +209,7 @@ export function InsuranceClaimDetails() {
               policyName={claim.policy.policy_name}
               policyId={claim.policy.policy_id}
               portal="insurance"
+              onViewPolicy={() => viewClaimPolicyContext(claim)}
             />
           )}
 
@@ -212,7 +235,7 @@ export function InsuranceClaimDetails() {
               <dl className="space-y-2">
                 <div className="flex justify-between items-baseline border-b border-slate-50 pb-1">
                   <dt className="text-[11px] text-slate-500">Decision</dt>
-                  <dd className="text-xs font-bold text-slate-800">{claim.decision.status.replace('_', ' ')}</dd>
+                  <dd className="text-xs font-bold text-slate-800">{decisionLabel(claim.decision.status)}</dd>
                 </div>
                 <div>
                   <dt className="text-[11px] text-slate-500 mb-1">Reason</dt>
@@ -240,22 +263,22 @@ export function InsuranceClaimDetails() {
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-2.5">Policy Reference</h3>
             <dl className="space-y-2">
               <div className="border-b border-slate-50 pb-1 flex justify-between items-baseline">
-                <dt className="text-[10px] text-slate-400 uppercase tracking-wider">Policy Plan</dt>
-                <dd className="text-xs font-bold text-slate-800">{claim.policy.payer} Secure Plus</dd>
+                <dt className="text-[10px] text-slate-400 uppercase tracking-wider">Payer</dt>
+                <dd className="text-xs font-bold text-slate-800">{claim.policy.payer || 'N/A'}</dd>
               </div>
               <div className="border-b border-slate-50 pb-1 flex justify-between items-baseline">
-                <dt className="text-[10px] text-slate-400 uppercase tracking-wider">Policy Start Date</dt>
-                <dd className="text-xs font-mono font-bold text-slate-700">Jan 01, 2025</dd>
+                <dt className="text-[10px] text-slate-400 uppercase tracking-wider">Policy ID</dt>
+                <dd className="text-xs font-mono font-bold text-slate-700">{claim.policy.policy_id || 'N/A'}</dd>
               </div>
               <div className="flex justify-between items-baseline">
-                <dt className="text-[10px] text-slate-400 uppercase tracking-wider">Policy End Date</dt>
-                <dd className="text-xs font-mono font-bold text-slate-700">Dec 31, 2025</dd>
+                <dt className="text-[10px] text-slate-400 uppercase tracking-wider">Policy Name</dt>
+                <dd className="text-xs font-mono font-bold text-slate-700">{claim.policy.policy_name || 'N/A'}</dd>
               </div>
             </dl>
             <div className="border-t border-slate-100 pt-2 mt-3">
               <button
                 type="button"
-                onClick={() => viewPolicyDocument(claim.policy.policy_id, claim.policy.policy_name, claim.policy.payer)}
+                onClick={() => viewClaimPolicyContext(claim)}
                 className="text-[11px] font-bold text-brand-600 hover:text-brand-700 hover:underline"
               >
                 View Policy Details

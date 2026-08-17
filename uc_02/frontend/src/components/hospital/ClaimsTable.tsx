@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '../ui/Badge';
 import { EmptyState } from '../common/EmptyState';
@@ -42,12 +42,19 @@ const statusDisplay: Record<string, string> = {
 interface ClaimsTableProps {
   claims: Claim[];
   portal: 'hospital' | 'insurance';
+  // Optional pre-applied search term (e.g. from the header search ?q= param).
+  initialQuery?: string;
 }
 
-export function ClaimsTable({ claims, portal }: ClaimsTableProps) {
+export function ClaimsTable({ claims, portal, initialQuery }: ClaimsTableProps) {
   const navigate    = useNavigate();
   const [tab, setTab] = useState<ClaimStatus | 'ALL'>('ALL');
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery ?? '');
+
+  // Keep the filter in sync when a new header search navigates here.
+  useEffect(() => {
+    setQuery(initialQuery ?? '');
+  }, [initialQuery]);
 
   const isHospital   = portal === 'hospital';
   const accentColor  = isHospital ? 'text-emerald-700'    : 'text-indigo-700';

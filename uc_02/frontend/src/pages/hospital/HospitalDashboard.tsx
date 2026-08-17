@@ -138,9 +138,10 @@ export function HospitalDashboard() {
   ];
 
   const statusDisplay: Record<string, string> = {
-    'REJECTED': 'Rejected',
-    'MORE_INFO': 'Needs Information',
-    'HUMAN_REVIEW': 'Under Human Review',
+    // Exact V1 outcome labels for decision badges.
+    'REJECTED': 'REJECT',
+    'MORE_INFO': 'REQUEST MORE INFORMATION',
+    'HUMAN_REVIEW': 'HUMAN REVIEW',
   };
 
   const statusBadgeVariant: Record<string, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
