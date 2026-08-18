@@ -10,7 +10,7 @@ const STATUS_CONFIG: Record<string, { label: string; cls: string; dot: string }>
   // Decision-terminal states keep the exact V1 outcome labels.
   ACCEPTED:          { label: 'APPROVE',                   cls: 'bg-emerald-50 text-emerald-700 border-emerald-200',   dot: 'bg-emerald-500' },
   REJECTED:          { label: 'REJECT',                    cls: 'bg-red-50 text-red-700 border-red-200',               dot: 'bg-red-500' },
-  MORE_INFO:         { label: 'REQUEST MORE INFORMATION',  cls: 'bg-amber-50 text-amber-700 border-amber-200',         dot: 'bg-amber-500' },
+  MORE_INFO:         { label: 'MORE INFORMATION REQUIRED',  cls: 'bg-amber-50 text-amber-700 border-amber-200',         dot: 'bg-amber-500' },
   HUMAN_REVIEW:      { label: 'HUMAN REVIEW',              cls: 'bg-blue-50 text-blue-700 border-blue-200',            dot: 'bg-blue-500' },
   PROCESSING:        { label: 'Processing',        cls: 'bg-violet-50 text-violet-700 border-violet-200',      dot: 'bg-violet-500 animate-pulse' },
   UNDER_REVIEW:      { label: 'Under Review',      cls: 'bg-violet-50 text-violet-700 border-violet-200',      dot: 'bg-violet-500 animate-pulse' },

@@ -60,6 +60,7 @@ export interface Claim {
   evidence_response?: EvidenceResponseSummary | null;
   submitted_at: string;
   updated_at: string;
+  workflow_state?: string;
 }
 
 export interface PolicyEvidenceItem {
@@ -86,6 +87,7 @@ export interface ClaimDecision {
   criteria_evaluations?: Record<string, any>;
   referenced_evidence_ids?: string[];
   criterion_assessments?: Record<string, any>;
+  reasoning?: string[];
   // Phase 2: informational-only Agent1 decision confidence (never changes the decision).
   confidence_score?: number | null;
   confidence_level?: string | null;
@@ -159,6 +161,7 @@ export interface ClaimDetails {
     matched_rule?: string;
     reason?: string;
     policy_reference?: string | null;
+    source?: string | null;
   } | null;
 }
 
@@ -246,6 +249,7 @@ export interface InsuranceClaim {
   submitted_at: string;
   updated_at: string;
   priority?: 'HIGH' | 'MEDIUM' | 'LOW';
+  workflow_state?: string;
 }
 
 // Human review queue item

@@ -161,9 +161,16 @@ export function ClaimsTable({ claims, portal, initialQuery }: ClaimsTableProps) 
                       {(c.resubmission_status ?? 'NOT_REQUIRED').replace(/_/g, ' ')}
                     </TableCell>
                     <TableCell className="px-5 py-3">
-                      <Badge variant={statusBadgeVariant[c.status] || 'default'}>
-                        {statusDisplay[c.status] || c.status}
-                      </Badge>
+                      <div className="flex flex-col gap-1">
+                        <Badge variant={statusBadgeVariant[c.status] || 'default'}>
+                          {statusDisplay[c.status] || c.status}
+                        </Badge>
+                        {c.workflow_state === 'HUMAN_REVIEW' && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-205 uppercase tracking-wider inline-block w-max">
+                            Awaiting verification
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="px-5 py-3 text-xs font-medium text-slate-400 text-right">
                       {new Date(c.updated_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}

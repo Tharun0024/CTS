@@ -130,7 +130,16 @@ export function IncomingClaimsTable({ claims, initialQuery }: IncomingClaimsTabl
                   <td className="px-4 py-2.5 text-[11px] font-semibold text-slate-600">
                     {(c.resubmission_status ?? 'NOT_REQUIRED').replace(/_/g, ' ')}
                   </td>
-                  <td className="px-4 py-2.5"><StatusBadge status={c.status} className="scale-95 origin-left" /></td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex flex-col gap-1">
+                      <StatusBadge status={c.status} className="scale-95 origin-left" />
+                      {c.workflow_state === 'HUMAN_REVIEW' && (
+                        <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-widest inline-block w-max scale-95 origin-left">
+                          Verify (Human Review)
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-2.5 text-slate-400 text-[11px]">
                     {new Date(c.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </td>

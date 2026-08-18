@@ -188,7 +188,22 @@ const KNOWN_FRONTEND_STATUSES = new Set<string>([
   'SUBMITTED_AGAIN',
 ]);
 
-export function toFrontendStatus(record: { status?: string; workflow_state?: string }): ClaimStatus {
+export function toFrontendStatus(record: { 
+  status?: string; 
+  workflow_state?: string; 
+  original_rejection?: any; 
+  decision_status?: string | null; 
+  decision?: { status?: string; outcome?: string } | null 
+}): ClaimStatus {
+  const isOriginallyRejected = record.original_rejection || 
+    record.decision_status === 'REJECT' || 
+    record.decision_status === 'REJECTED' || 
+    record.decision?.status === 'REJECT' || 
+    record.decision?.status === 'REJECTED';
+    
+  if (record.workflow_state === 'HUMAN_REVIEW' && isOriginallyRejected) {
+    return 'REJECTED';
+  }
   if (record.status && KNOWN_FRONTEND_STATUSES.has(record.status)) {
     return record.status as ClaimStatus;
   }
@@ -283,9 +298,13 @@ function mapPolicyEvidence(record: BackendRecord): PolicyEvidenceItem[] {
       );
       return {
         criterion: String(item.evidence_key),
+        evidence_key: String(item.evidence_key),
+        evidence_id: item.evidence_id ?? 'N/A',
         patient_value: (facts['content_reference'] as string) || item.source || 'Documented in patient record',
+        content_reference: (facts['content_reference'] as string) || item.source || 'Documented in patient record',
         status: notMet ? 'NOT_MET' : 'MET',
         source: provenance,
+        provenance: provenance,
       } as PolicyEvidenceItem;
     });
 }
@@ -372,6 +391,7 @@ export function toClaimDetails(record: BackendRecord): ClaimDetails {
           criteria_evaluations: decision.criteria_evaluations,
           referenced_evidence_ids: decision.referenced_evidence_ids,
           criterion_assessments: decision.criterion_assessments,
+          reasoning: decision.reasoning,
           confidence_score: decision.confidence_score ?? null,
           confidence_level: decision.confidence_level ?? null,
           confidence_factors: decision.confidence_factors ?? [],
@@ -445,7 +465,11 @@ export function toClaimDetails(record: BackendRecord): ClaimDetails {
 // ---------------------------------------------------------------------------
 
 export function toClaimSummary(summary: BackendSummary): Claim {
-  const status = toFrontendStatus({ status: summary.status, workflow_state: summary.workflow_state });
+  const status = toFrontendStatus({ 
+    status: summary.status, 
+    workflow_state: summary.workflow_state,
+    decision_status: summary.decision_status || summary.decision_outcome
+  });
   return {
     claim_id: summary.claim_id,
     patient_id: summary.patient_id ?? 'UNKNOWN',
@@ -464,5 +488,6 @@ export function toClaimSummary(summary: BackendSummary): Claim {
     submitted_at: summary.updated_at ?? '',
     updated_at: summary.updated_at ?? '',
     simulation_id: summary.simulation_id,
+    workflow_state: summary.workflow_state,
   } as Claim & { simulation_id?: string };
 }

@@ -9,6 +9,7 @@ import { ErrorState } from '../../components/common/ErrorState';
 import { getReviewDetails } from '../../services/reviewApi';
 import { HumanReviewWorkspace } from '../../components/shared/HumanReviewWorkspace';
 import { PriorAuthStatusCard } from '../../components/shared/PriorAuthStatusCard';
+import { DecisionChain } from '../../components/shared/DecisionChain';
 import type { ReviewDetails } from '../../types/claim';
 import { ArrowLeft, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -87,42 +88,43 @@ export function ReviewDetail() {
       <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3.5 flex items-start gap-2.5 shadow-sm animate-fade-in-up">
         <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
         <div>
-          <p className="text-xs font-bold text-amber-900 uppercase tracking-wide">Reason for Human Review</p>
-          <p className="text-xs text-amber-800 mt-0.5 font-medium">{review.reason_for_review}</p>
+          <p className="text-xs font-bold text-amber-905 uppercase tracking-wide font-sans">Reason for Human Review</p>
+          <p className="text-xs text-amber-805 mt-0.5 font-medium">{review.reason_for_review}</p>
         </div>
       </div>
 
-
+      {/* Decision Flow Chain */}
+      <DecisionChain claim={claim} />
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* Left: claim data */}
         <div className="xl:col-span-2 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <PatientInfoCard patient={claim.patient} />
-            <ClinicalInfoCard claim={claim.claim} />
+            <PatientInfoCard patient={claim.patient || { patient_id: 'UNKNOWN', age: 0, gender: 'Unknown' }} />
+            <ClinicalInfoCard claim={claim.claim || { procedure: 'Unspecified', procedure_code: 'N/A', diagnosis_codes: [], service_date: '' }} />
           </div>
 
           {/* Phase 4: persisted Phase 1 prior-auth pre-check (same authoritative record) */}
           <PriorAuthStatusCard claim={claim} portal="insurance" />
 
-          {claim.policy_evidence.length > 0 && (
+          {(claim.policy_evidence || []).length > 0 && (
             <PolicyEvidencePanel
               evidence={claim.policy_evidence}
-              policyName={claim.policy.policy_name}
-              policyId={claim.policy.policy_id}
+              policyName={claim.policy?.policy_name || 'Policy on file'}
+              policyId={claim.policy?.policy_id}
               portal="insurance"
             />
           )}
 
-          {claim.status === 'HUMAN_REVIEW' && (
+          {(claim.status === 'HUMAN_REVIEW' || claim.workflow_state === 'HUMAN_REVIEW') && (
             <HumanReviewWorkspace claim={claim} portal="insurance" />
           )}
 
-          {claim.missing_information.length > 0 && (
+          {(claim.missing_information || []).length > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3.5 shadow-sm animate-fade-in-up">
-              <h3 className="text-xs font-bold text-amber-905 uppercase tracking-wide mb-2">Missing Information</h3>
+              <h3 className="text-xs font-bold text-amber-900 uppercase tracking-wide mb-2">Missing Information</h3>
               <ul className="space-y-1">
-                {claim.missing_information.map((item, i) => (
+                {(claim.missing_information || []).map((item, i) => (
                   <li key={i} className="flex items-start gap-1.5 text-xs text-amber-800 font-medium">
                     <span className="text-amber-500 font-bold">•</span>
                     {item}

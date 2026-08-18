@@ -17,6 +17,7 @@ import { HumanReviewWorkspace } from '../../components/shared/HumanReviewWorkspa
 import { HospitalHumanResolutionPanel } from '../../components/hospital/HospitalHumanResolutionPanel';
 import { PriorAuthStatusCard } from '../../components/shared/PriorAuthStatusCard';
 import { AgentConfidenceCard } from '../../components/shared/AgentConfidenceCard';
+import { DecisionChain } from '../../components/shared/DecisionChain';
 import { decisionLabel } from '../../utils/decisionHumanizer';
 import { usePolling, isTerminalStatus } from '../../services/polling';
 import type { ClaimDetails, ClaimVersion } from '../../types/claim';
@@ -62,37 +63,32 @@ export function HospitalClaimDetails() {
     <ErrorState message={error || 'Claim not found.'} onRetry={fetchClaim} />
   );
 
-
-
   /* Status banners config */
   const banners: Record<string, { icon: any; title: string; msg: string; cls: string; iconCls: string }> = {
     PROCESSING: { icon: Loader2, title: 'Processing Claim', msg: 'Extracting data and running policy analysis… This page updates automatically.', cls: 'bg-violet-50 border-violet-200', iconCls: 'text-violet-600' },
     SUBMITTED: { icon: Loader2, title: 'Claim Received', msg: 'Processing documents… Average wait: 2–3 minutes.', cls: 'bg-violet-50 border-violet-200', iconCls: 'text-violet-600' },
     UNDER_REVIEW: { icon: Loader2, title: 'Under Review', msg: 'Policy criteria under review…', cls: 'bg-violet-50 border-violet-200', iconCls: 'text-violet-600' },
     ACCEPTED: { icon: CheckCircle2, title: 'APPROVE', msg: claim.decision?.reason || '', cls: 'bg-emerald-50 border-emerald-200', iconCls: 'text-emerald-600' },
-    // Phase 4: terminal REJECT only exists AFTER human verification completes
-    // (Phase 3 routing), so this banner can never precede the resolution.
     REJECTED: { icon: AlertTriangle, title: 'REJECT', msg: claim.decision?.reason || '', cls: 'bg-red-50 border-red-200', iconCls: 'text-red-600' },
-    MORE_INFO: { icon: AlertTriangle, title: 'REQUEST MORE INFORMATION', msg: claim.decision?.reason || '', cls: 'bg-amber-50 border-amber-200', iconCls: 'text-amber-600' },
+    MORE_INFO: { icon: AlertTriangle, title: 'MORE INFORMATION REQUIRED', msg: claim.decision?.reason || '', cls: 'bg-amber-50 border-amber-200', iconCls: 'text-amber-600' },
     HUMAN_REVIEW: { icon: Users, title: 'HUMAN REVIEW', msg: claim.decision?.reason || '', cls: 'bg-blue-50 border-blue-200', iconCls: 'text-blue-600' },
     RESUBMISSION_CHECK: { icon: Shield, title: 'Resubmission Under Analysis', msg: 'Checking all criteria for resubmission eligibility…', cls: 'bg-indigo-50 border-indigo-200', iconCls: 'text-indigo-600' },
-    SUBMITTED_AGAIN: { icon: CheckCircle2, title: 'Claim Resubmitted', msg: 'Awaiting review by the insurer.', cls: 'bg-sky-50 border-sky-200', iconCls: 'text-sky-600' },
+    SUBMITTED_AGAIN: { icon: CheckCircle2, title: 'Claim Resubmitted', msg: 'Awaiting review by the insurer.', cls: 'bg-sky-50 border-sky-200', iconCls: 'text-sky-655' },
   };
 
   const banner = banners[claim.status];
   const BannerIcon = banner?.icon;
   const isSpinning = ['PROCESSING', 'SUBMITTED', 'UNDER_REVIEW'].includes(claim.status);
 
-  // Gap 3: attempts driven by the real backend versions (V1/V2 + decisions).
   const versionsForView: ClaimVersion[] = (claim.versions && claim.versions.length > 0)
     ? claim.versions
     : [{
-        version: 'V1',
-        attempt: 1,
-        decision: claim.decision
-          ? { status: claim.decision.status, reason: claim.decision.reason, reason_code: claim.decision.reason_code }
-          : null,
-      }];
+      version: 'V1',
+      attempt: 1,
+      decision: claim.decision
+        ? { status: claim.decision.status, reason: claim.decision.reason, reason_code: claim.decision.reason_code }
+        : null,
+    }];
   const versionStatusCls: Record<string, string> = {
     ACCEPT: 'text-emerald-600',
     REJECT: 'text-red-600',
@@ -104,9 +100,18 @@ export function HospitalClaimDetails() {
     setIsPolicyOpen(true);
   };
 
+  const requiredEvidencePaths = claim.decision?.criterion_assessments
+    ? Object.values(claim.decision.criterion_assessments)
+      .flatMap((a: any) => a.required_evidence_paths || [])
+      .filter(Boolean)
+    : [];
+
   return (
     <div className="max-w-7xl mx-auto w-full pb-10">
       <ClaimHeader claim={claim} backPath="/hospital/claims" backLabel="Back to Claims" portal="hospital" />
+
+      {/* Decision Flow Chain */}
+      <DecisionChain claim={claim} />
 
       {/* Status Banner */}
       {banner && (
@@ -114,14 +119,14 @@ export function HospitalClaimDetails() {
           <BannerIcon className={clsx('w-5 h-5 flex-shrink-0 mt-0.5', banner.iconCls, isSpinning && 'animate-spin')} />
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-extrabold text-slate-900">{banner.title}</p>
-            {banner.msg && <p className="text-[12px] text-slate-600 font-medium mt-0.5 whitespace-pre-wrap">{banner.msg}</p>}
+            {banner.msg && <p className="text-[12px] text-slate-605 font-medium mt-0.5 whitespace-pre-wrap">{banner.msg}</p>}
           </div>
           {claim.status === 'ACCEPTED' && (
             <span className="flex-shrink-0 text-[11px] font-extrabold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg">
-              {claim.policy_evidence.filter(e => e.status === 'MET').length}/{claim.policy_evidence.length} criteria met
+              {(claim.policy_evidence || []).filter(e => e.status === 'MET').length}/{(claim.policy_evidence || []).length} criteria met
             </span>
           )}
-          {claim.status === 'REJECTED' && claim.resubmission.eligible && (
+          {claim.status === 'REJECTED' && claim.resubmission?.eligible && (
             <Button
               variant="outline"
               size="sm"
@@ -139,7 +144,7 @@ export function HospitalClaimDetails() {
         {/* Left 2 cols */}
         <div className="xl:col-span-2 space-y-5">
           <div className="grid grid-cols-1 gap-5">
-            <PatientInfoCard patient={claim.patient} portal="hospital" />
+            <PatientInfoCard patient={claim.patient || { patient_id: 'UNKNOWN', age: 0, gender: 'Unknown' }} portal="hospital" />
           </div>
 
           {/* V1 Workflow Details */}
@@ -155,97 +160,110 @@ export function HospitalClaimDetails() {
             </CardHeader>
             <CardContent className="p-5 space-y-6">
 
-              {/* Grid for Evidence Request & Response */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {claim.status === 'MORE_INFO' || claim.evidence_request ? (
+                <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-4.5 space-y-4">
+                  <div className="flex items-center justify-between border-b border-amber-200 pb-2">
+                    <h4 className="text-[12px] font-black text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 text-amber-600" />
+                      MORE INFORMATION REQUIRED
+                    </h4>
+                    <span className="text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                      {claim.evidence_request?.status.replace(/_/g, ' ') || 'AWAITING RESPONSE'}
+                    </span>
+                  </div>
 
-                {/* 1. Evidence Request */}
-                {claim.evidence_request ? (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-[11px] font-black text-amber-900 uppercase tracking-wider">Evidence Request</h4>
-                      <span className="text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 px-2.5 py-0.5 rounded-full">
-                        {claim.evidence_request.status.replace(/_/g, ' ')}
-                      </span>
-                    </div>
-                    <div className="space-y-1.5 text-xs">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div className="space-y-3">
                       <div>
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Requested Evidence</span>
-                        <p className="font-extrabold text-slate-900 mt-0.5">{claim.evidence_request.requested_evidence}</p>
+                        <p className="font-extrabold text-slate-900 mt-0.5">{claim.evidence_request?.requested_evidence || 'N/A'}</p>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Reason</span>
-                        <p className="font-medium text-slate-700 mt-0.5">{claim.evidence_request.reason}</p>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide font-sans">Agent 1 Reasoning</span>
+                        <div className="font-medium text-slate-700 mt-0.5 space-y-1 bg-white p-2.5 rounded-lg border border-slate-100 max-h-40 overflow-y-auto font-mono text-[11px] leading-relaxed">
+                          {claim.decision?.reasoning && claim.decision.reasoning.length > 0 ? (
+                            claim.decision.reasoning.map((r, i) => <p key={i}>{r}</p>)
+                          ) : (
+                            <p>{claim.decision?.reason || 'No specific reasoning trace provided.'}</p>
+                          )}
+                        </div>
                       </div>
+                      {claim.decision?.criterion_assessments && (
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Required Evidence Paths</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {requiredEvidencePaths.map((path, idx) => (
+                              <span key={idx} className="font-mono text-[10px] bg-white text-slate-800 px-2 py-0.5 rounded border border-slate-150 shadow-sm">
+                                {path}
+                              </span>
+                            ))}
+                            {requiredEvidencePaths.length === 0 && (
+                              <span className="text-slate-405 italic">None recorded.</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Status</span>
-                        <p className="font-extrabold text-amber-700 mt-0.5">
-                          {claim.evidence_request.status === 'PENDING_PROVIDER_RESPONSE' ? 'PENDING PROVIDER RESPONSE' : claim.evidence_request.status.replace(/_/g, ' ')}
-                        </p>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Agent 2 Recovery Status</span>
+                        <div className="mt-0.5 p-2.5 bg-white rounded-lg border border-slate-100 text-[11px] font-medium text-slate-700 space-y-1.5 shadow-sm">
+                          {claim.agent2_invoked ? (
+                            <>
+                              <p className="font-extrabold text-indigo-700 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                                Agent 2 Recovery Invoked
+                              </p>
+                              {claim.recovery_result?.recovered_evidence_ids && claim.recovery_result.recovered_evidence_ids.length > 0 ? (
+                                <p>Recovered Evidence: <span className="font-mono bg-indigo-50 px-1 py-0.2 rounded border border-indigo-100">{claim.recovery_result.recovered_evidence_ids.join(', ')}</span></p>
+                              ) : (
+                                <p className="text-slate-400 italic">No releasable evidence recovered by Agent 2 yet.</p>
+                              )}
+                              {claim.recovery_result?.notes && claim.recovery_result.notes.map((note, idx) => (
+                                <p key={idx} className="text-slate-500 italic text-[10px]">• {note}</p>
+                              ))}
+                            </>
+                          ) : (
+                            <p className="text-slate-400 italic">Agent 2 Recovery not invoked / not available.</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Provider Resubmission Status</span>
+                        <div className="mt-0.5 p-2.5 bg-white rounded-lg border border-slate-100 text-[11px] font-medium text-slate-700 space-y-1.5 shadow-sm">
+                          <p>Status: <span className="font-extrabold text-slate-900 uppercase">{claim.resubmission_status || claim.resubmission?.status || 'NOT REQUIRED'}</span></p>
+                          {claim.provider_decisions && claim.provider_decisions.length > 0 ? (
+                            <div className="border-t border-slate-100 pt-1.5 mt-1.5 space-y-1">
+                              <p className="font-bold text-slate-800">Hospital Provider Decisions:</p>
+                              {claim.provider_decisions.map((d, i) => (
+                                <p key={i} className="text-[10px] border-b border-slate-50 pb-1 last:border-0">
+                                  <span className={`font-black px-1 rounded ${d.decision === 'ACCEPT' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'}`}>{d.decision}</span> on {d.decided_at ? new Date(d.decided_at).toLocaleString() : 'N/A'}
+                                  {d.reason && <span className="text-slate-404 italic block mt-0.5">Reason: {d.reason}</span>}
+                                </p>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-slate-404 italic">No provider consent decisions recorded.</p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="bg-slate-50 border border-slate-200 border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center">
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-slate-50 border border-slate-205 border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center">
                     <Clock className="w-6 h-6 text-slate-350 mb-2" />
                     <p className="text-xs font-semibold text-slate-500">No Evidence Request</p>
                     <p className="text-[10px] text-slate-400 mt-0.5">This claim has not requested additional clinical documents.</p>
                   </div>
-                )}
-
-                {/* 3. Evidence Response */}
-                {claim.evidence_response ? (
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-[11px] font-black text-emerald-900 uppercase tracking-wider">Evidence Response</h4>
-                      <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                        {claim.evidence_response.status.replace(/_/g, ' ')}
-                      </span>
-                    </div>
-                    <div className="space-y-1.5 text-xs">
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Evidence</span>
-                        <p className="font-extrabold text-slate-900 mt-0.5">{claim.evidence_response.evidence}</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Decision</span>
-                        <p className="font-extrabold text-emerald-700 mt-0.5">{claim.evidence_response.decision}</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Status</span>
-                        <p className="font-extrabold text-emerald-800 mt-0.5">
-                          {claim.evidence_response.status === 'SENT_TO_PAYER' ? 'SENT TO PAYER' : claim.evidence_response.status.replace(/_/g, ' ')}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-slate-50 border border-slate-200 border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center">
+                  <div className="bg-slate-50 border border-slate-205 border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center">
                     <Clock className="w-6 h-6 text-slate-350 mb-2" />
                     <p className="text-xs font-semibold text-slate-500">No Evidence Uploaded</p>
                     <p className="text-[10px] text-slate-400 mt-0.5">Awaiting provider clinical data release.</p>
                   </div>
-                )}
-
-              </div>
-
-              {/* 2. Agent 2 Result (If present) */}
-              {(claim.agent2_result || claim.evidence_response?.decision) && (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-emerald-600 animate-pulse" />
-                    <div>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Decision Engine</span>
-                      <span className="text-xs font-extrabold text-slate-800">Agent 2 Evaluation Outcome</span>
-                    </div>
-                  </div>
-                  <span className={clsx(
-                    'text-xs font-black px-3 py-1 rounded-lg border shadow-sm',
-                    (claim.agent2_result ?? claim.evidence_response?.decision) === 'RELEASED'
-                      ? 'bg-emerald-100 border-emerald-200 text-emerald-700'
-                      : 'bg-amber-100 border-amber-200 text-amber-700'
-                  )}>
-                    Agent 2 {(claim.agent2_result ?? claim.evidence_response?.decision ?? '').replace(/_/g, ' ')}
-                  </span>
                 </div>
               )}
 
@@ -290,7 +308,7 @@ export function HospitalClaimDetails() {
                     <div className="flex-1 border border-dashed border-slate-200 rounded-xl p-3 flex items-center justify-center text-center">
                       <div>
                         <span className="text-xs font-bold text-slate-400 block">Attempt 2</span>
-                        <span className="text-[10px] text-slate-350 mt-1 block">Awaiting resubmission path</span>
+                        <span className="text-[10px] text-slate-355 mt-1 block">Awaiting resubmission path</span>
                       </div>
                     </div>
                   )}
@@ -301,18 +319,18 @@ export function HospitalClaimDetails() {
             </CardContent>
           </Card>
 
-          {claim.policy_evidence.length > 0 && (
-            <PolicyEvidencePanel evidence={claim.policy_evidence} policyName={claim.policy.policy_name} policyId={claim.policy.policy_id} portal="hospital" onViewPolicy={handleViewPolicyDetails} />
+          {(claim.policy_evidence || []).length > 0 && (
+            <PolicyEvidencePanel evidence={claim.policy_evidence} policyName={claim.policy?.policy_name || 'Policy on file'} policyId={claim.policy?.policy_id} portal="hospital" onViewPolicy={handleViewPolicyDetails} />
           )}
 
-          {claim.status === 'HUMAN_REVIEW' && (
+          {(claim.status === 'HUMAN_REVIEW' || claim.workflow_state === 'HUMAN_REVIEW') && (
             <>
               <HumanReviewWorkspace claim={claim} portal="hospital" />
               <HospitalHumanResolutionPanel claim={claim} onResolved={fetchClaim} />
             </>
           )}
 
-          {claim.status === 'MORE_INFO' && claim.missing_information.length > 0 && (
+          {claim.status === 'MORE_INFO' && (claim.missing_information || []).length > 0 && (
             <MissingInfoUploader
               claimId={claim.claim_id}
               missingItems={claim.missing_information}
@@ -351,10 +369,10 @@ export function HospitalClaimDetails() {
             </CardHeader>
             <CardContent className="px-5 py-4 space-y-3">
               {[
-                { label: 'Payer', value: claim.policy.payer },
-                { label: 'Policy ID', value: claim.policy.policy_id },
-                { label: 'Policy Name', value: claim.policy.policy_name },
-                { label: 'Procedure Code', value: claim.claim.procedure_code },
+                { label: 'Payer', value: claim.policy?.payer },
+                { label: 'Policy ID', value: claim.policy?.policy_id },
+                { label: 'Policy Name', value: claim.policy?.policy_name },
+                { label: 'Procedure Code', value: claim.claim?.procedure_code },
               ].map(r => (
                 <div key={r.label} className="flex items-baseline justify-between border-b border-slate-50 pb-2 last:border-0 last:pb-0">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{r.label}</span>
@@ -376,7 +394,7 @@ export function HospitalClaimDetails() {
         <PolicyModal
           isOpen={isPolicyOpen}
           onClose={() => setIsPolicyOpen(false)}
-          policyId={claim.policy.policy_id}
+          policyId={claim.policy?.policy_id}
           claim={claim}
         />
       )}

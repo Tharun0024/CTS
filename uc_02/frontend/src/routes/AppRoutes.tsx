@@ -10,6 +10,7 @@ import { HospitalClaimDetails }from '../pages/hospital/ClaimDetails';
 import { Notifications }       from '../pages/hospital/Notifications';
 import { Authorizations }      from '../pages/hospital/Authorizations';
 import { Settings }            from '../pages/hospital/Settings';
+import { HospitalReviewQueue } from '../pages/hospital/HospitalReviewQueue';
 
 // Insurance pages
 import { InsuranceDashboard }     from '../pages/insurance/InsuranceDashboard';
@@ -37,6 +38,7 @@ function PageTitleUpdater() {
       else if (path.includes('providers')) title = 'Providers - Hospital Portal';
       else if (path.includes('claims/new')) title = 'New Claim - Hospital Portal';
       else if (path.includes('claims')) title = 'Claims - Hospital Portal';
+      else if (path.includes('review')) title = 'Review Queue - Hospital Portal';
       else if (path.includes('settings')) title = 'Settings - Hospital Portal';
       else title = 'Hospital Portal - AuthFlow';
     } else if (path.startsWith('/insurance')) {
@@ -71,6 +73,7 @@ export function AppRoutes() {
         <Route path="/hospital/claims/new"       element={<CreateClaim />} />
         <Route path="/hospital/claims"           element={<ClaimsList />} />
         <Route path="/hospital/claims/:id"       element={<HospitalClaimDetails />} />
+        <Route path="/hospital/review"           element={<HospitalReviewQueue />} />
         <Route path="/hospital/authorizations"   element={<Authorizations />} />
         <Route path="/hospital/notifications"    element={<Notifications />} />
         <Route path="/hospital/settings"         element={<Settings />} />

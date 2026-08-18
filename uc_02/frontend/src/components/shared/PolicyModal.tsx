@@ -59,7 +59,7 @@ export function PolicyModal({ isOpen, onClose, policyId, claim }: PolicyModalPro
 
   if (!isOpen) return null;
 
-  const isAetna = (policy?.payer || claim.policy.payer || '').toLowerCase().includes('aetna');
+  const isAetna = (policy?.payer || claim.policy?.payer || '').toLowerCase().includes('aetna');
   const accentColor = isAetna ? 'text-rose-600 bg-rose-50 border-rose-100' : 'text-blue-600 bg-blue-50 border-blue-100';
   const buttonAccent = isAetna ? 'hover:bg-rose-50 text-rose-600 border-rose-200' : 'hover:bg-blue-50 text-blue-600 border-blue-200';
 
@@ -75,14 +75,14 @@ export function PolicyModal({ isOpen, onClose, policyId, claim }: PolicyModalPro
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
               <span className={clsx('text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border', accentColor)}>
-                {policy?.payer || claim.policy.payer || 'Payer'}
+                {policy?.payer || claim.policy?.payer || 'Payer'}
               </span>
               <span className="text-xs font-mono font-bold text-slate-400">
                 {policyId}
               </span>
             </div>
             <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
-              {policy?.policy_title || claim.policy.policy_name || 'Policy Details'}
+              {policy?.policy_title || claim.policy?.policy_name || 'Policy Details'}
             </h2>
           </div>
           <button 

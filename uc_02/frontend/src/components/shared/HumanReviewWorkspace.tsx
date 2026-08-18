@@ -116,19 +116,19 @@ export function HumanReviewWorkspace({ claim, portal = 'hospital' }: HumanReview
           <dl className="space-y-2 text-xs">
             <div className="flex justify-between border-b border-slate-50 pb-1.5">
               <dt className="text-slate-500 font-bold">Payer</dt>
-              <dd className="font-extrabold text-slate-850">{claim.policy.payer}</dd>
+              <dd className="font-extrabold text-slate-850">{claim.policy?.payer || 'N/A'}</dd>
             </div>
             <div className="flex justify-between border-b border-slate-50 pb-1.5">
               <dt className="text-slate-500 font-bold">Policy ID</dt>
-              <dd className="font-mono font-bold text-slate-850">{claim.policy.policy_id}</dd>
+              <dd className="font-mono font-bold text-slate-850">{claim.policy?.policy_id || 'N/A'}</dd>
             </div>
             <div className="flex justify-between border-b border-slate-50 pb-1.5">
               <dt className="text-slate-500 font-bold">Procedure Code</dt>
-              <dd className="font-mono font-bold text-slate-850">{claim.claim.procedure_code}</dd>
+              <dd className="font-mono font-bold text-slate-850">{claim.claim?.procedure_code || 'N/A'}</dd>
             </div>
             <div className="flex flex-col">
               <dt className="text-slate-500 font-bold mb-0.5">Procedure Description</dt>
-              <dd className="font-semibold text-slate-800 leading-normal">{claim.claim.procedure}</dd>
+              <dd className="font-semibold text-slate-800 leading-normal">{claim.claim?.procedure || 'N/A'}</dd>
             </div>
           </dl>
         </div>
@@ -303,13 +303,45 @@ export function HumanReviewWorkspace({ claim, portal = 'hospital' }: HumanReview
                   {Object.entries(claim.decision?.criteria_evaluations || {}).map(([cid, evalItem]: [string, any]) => {
                     const isMet = evalItem.status === 'MET';
                     const assessment = claim.decision?.criterion_assessments?.[cid] || evalItem.reason || 'No specific assessment logged.';
+
+                    const renderAssessmentText = () => {
+                      if (!assessment) return 'No specific assessment logged.';
+                      if (typeof assessment === 'object') {
+                        if (Array.isArray(assessment.reasoning)) {
+                          return (
+                            <div className="space-y-1">
+                              {assessment.reasoning.map((r: string, idx: number) => (
+                                <p key={idx}>{r}</p>
+                              ))}
+                              {assessment.evidence_paths && assessment.evidence_paths.length > 0 && (
+                                <p className="text-[10px] text-slate-400 font-mono mt-1">
+                                  Evidence: {assessment.evidence_paths.join(', ')}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        }
+                        if (typeof assessment.reasoning === 'string') {
+                          return assessment.reasoning;
+                        }
+                        if (Array.isArray(assessment.reason)) {
+                          return assessment.reason.join(' ');
+                        }
+                        if (typeof assessment.reason === 'string') {
+                          return assessment.reason;
+                        }
+                        return JSON.stringify(assessment);
+                      }
+                      return String(assessment);
+                    };
+
                     return (
                       <tr key={cid} className="hover:bg-slate-50/20">
                         <td className="px-4 py-3 font-bold text-slate-800 align-top leading-normal">
                           {cid.replace(/_/g, ' ')}
                         </td>
-                        <td className="px-4 py-3 text-slate-600 leading-relaxed font-semibold">
-                          {assessment}
+                        <td className="px-4 py-3 text-slate-600 leading-relaxed font-semibold font-mono text-[11px]">
+                          {renderAssessmentText()}
                         </td>
                         <td className="px-4 py-3 text-right align-top">
                           <span className={clsx(

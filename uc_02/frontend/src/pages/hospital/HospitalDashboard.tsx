@@ -119,7 +119,7 @@ export function HospitalDashboard() {
   const processing = claims.filter(c => ['PROCESSING', 'UNDER_REVIEW', 'SUBMITTED', 'SUBMITTED_AGAIN', 'RESUBMISSION_CHECK', 'DRAFT'].includes(c.status)).length;
   const needsInfo = count('MORE_INFO');
   const rejected = count('REJECTED');
-  const humanReview = count('HUMAN_REVIEW');
+  const humanReview = claims.filter(c => c.workflow_state === 'HUMAN_REVIEW' || c.status === 'HUMAN_REVIEW').length;
 
   const pct = (num: number) => total > 0 ? Math.round((num / total) * 100) : 0;
 
@@ -129,7 +129,7 @@ export function HospitalDashboard() {
     { label: 'Processing', value: processing, sub: `${pct(processing)}% in pipeline`, icon: Clock, gradient: 'from-blue-600 to-indigo-700', path: '/hospital/claims' },
     { label: 'Needs Info', value: needsInfo, sub: needsInfo > 0 ? 'Action required' : 'All clear', icon: AlertTriangle, gradient: needsInfo > 0 ? 'from-amber-500 to-orange-600' : 'from-amber-400 to-amber-600', path: '/hospital/claims' },
     { label: 'Denied', value: rejected, sub: `${pct(rejected)}% rejection rate`, icon: XCircle, gradient: 'from-rose-600 to-red-700', path: '/hospital/claims' },
-    { label: 'Human Review', value: humanReview, sub: `${pct(humanReview)}% hold`, icon: Users, gradient: 'from-indigo-600 to-indigo-850', path: '/hospital/claims' },
+    { label: 'Human Review', value: humanReview, sub: `${pct(humanReview)}% hold`, icon: Users, gradient: 'from-indigo-600 to-indigo-850', path: '/hospital/review' },
   ];
 
   // V1 Workflow stats

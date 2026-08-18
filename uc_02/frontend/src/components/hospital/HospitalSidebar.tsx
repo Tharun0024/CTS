@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FilePlus2, List,
-  ShieldCheck,
+  ShieldCheck, Users,
   Bell, Settings,
   X, Activity, ChevronRight
 } from 'lucide-react';
@@ -33,6 +33,7 @@ const navGroups = [
     title: 'Care Operations',
     items: [
       { name: 'Authorizations', path: '/hospital/authorizations', icon: ShieldCheck },
+      { name: 'Human Review', path: '/hospital/review', icon: Users },
     ]
   },
   {
