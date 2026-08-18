@@ -5,6 +5,8 @@ import { PatientInfoCard } from '../../components/shared/PatientInfoCard';
 import { PolicyEvidencePanel } from '../../components/shared/PolicyEvidencePanel';
 import { ClaimTimeline } from '../../components/shared/ClaimTimeline';
 import { HumanReviewWorkspace } from '../../components/shared/HumanReviewWorkspace';
+import { PriorAuthStatusCard } from '../../components/shared/PriorAuthStatusCard';
+import { AgentConfidenceCard } from '../../components/shared/AgentConfidenceCard';
 import { LoadingState } from '../../components/common/LoadingState';
 import { ErrorState } from '../../components/common/ErrorState';
 import { getInsuranceClaimDetails } from '../../services/insuranceApi';
@@ -97,6 +99,9 @@ export function InsuranceClaimDetails() {
           <div className="grid grid-cols-1 gap-4">
             <PatientInfoCard patient={claim.patient} />
           </div>
+
+          {/* Phase 4: persisted Phase 1 prior-auth pre-check (identical record as the hospital portal) */}
+          <PriorAuthStatusCard claim={claim} portal="insurance" />
 
           {/* V1 Workflow Details */}
           <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm space-y-4 animate-fade-in-up">
@@ -241,9 +246,20 @@ export function InsuranceClaimDetails() {
                     {claim.decision.reason}
                   </dd>
                 </div>
+                {claim.human_resolution && (
+                  <div>
+                    <dt className="text-[11px] text-slate-500 mb-1">Human Resolution (Hospital)</dt>
+                    <dd className="text-xs text-slate-700 leading-relaxed bg-rose-50 p-2.5 rounded border border-rose-100 font-medium whitespace-pre-wrap">
+                      {claim.human_resolution}
+                    </dd>
+                  </div>
+                )}
               </dl>
             </div>
           )}
+
+          {/* Phase 4: persisted Phase 2 confidence metrics (same values as the hospital portal) */}
+          <AgentConfidenceCard claim={claim} />
 
         </div>
 

@@ -22,10 +22,14 @@ class DecisionReasonCode(str, Enum):
     Routing contract (V1, frozen):
       - APPROVE (ALL_CRITERIA_SATISFIED) -> terminal.
       - REQUEST_MORE_INFORMATION (MISSING_DOCUMENTATION) -> Agent2 recovery.
-      - REJECT (COVERAGE_EXCLUSION / CRITERION_FAILED_HARD) -> terminal hard
-        denial; Agent2 is NEVER invoked. There is no generic REJECT recovery.
+      - REJECT (COVERAGE_EXCLUSION / CRITERION_FAILED_HARD) -> the decision
+        engine outcome is final and immutable, but workflow routing holds the
+        claim in HUMAN_REVIEW for human cross-verification before any terminal
+        status (Phase 3); Agent2 is NEVER invoked for REJECT.
       - HUMAN_REVIEW (all HUMAN_REVIEW_* codes) -> human workflow; Agent2 is
         NOT directly invoked.
+      - HUMAN_DECISION marks the authoritative human resolution after
+        cross-verification (Phase 3); it never originates from Agent 1.
     """
     ALL_CRITERIA_SATISFIED = "ALL_CRITERIA_SATISFIED"
     COVERAGE_EXCLUSION = "COVERAGE_EXCLUSION"
@@ -40,6 +44,7 @@ class DecisionReasonCode(str, Enum):
     NO_MATCHING_POLICY = "NO_MATCHING_POLICY"
     PIPELINE_FAIL_CLOSED = "PIPELINE_FAIL_CLOSED"
     PROVIDER_CLAIM_NOT_FOUND = "PROVIDER_CLAIM_NOT_FOUND"
+    HUMAN_DECISION = "HUMAN_DECISION"
 
 
 class CriterionAssessmentStatus(str, Enum):
@@ -226,6 +231,12 @@ class DecisionResponse(BaseModel):
     requested_information: List[str] = Field(default_factory=list)
     referenced_evidence_ids: List[str] = Field(default_factory=list)
     agent2_recoverable: bool = False
+    # Phase 2 confidence metrics: informational-only signals derived AFTER the
+    # deterministic decision from existing evidence-grounded engine outputs.
+    # They NEVER influence outcome/reason_code/routing (frozen V1 semantics).
+    confidence_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    confidence_level: Optional[str] = None  # HIGH | MEDIUM | LOW
+    confidence_factors: List[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def enforce_routing_semantics(self) -> "DecisionResponse":

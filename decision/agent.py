@@ -15,7 +15,7 @@ from decision.schemas import (
     CriterionAssessmentStatus,
     PolicyCriterion,
 )
-from decision.decision_logic import make_decision
+from decision.decision_logic import attach_confidence_metrics, make_decision
 from decision.llm_provider import LLMProvider, NVIDIAProvider
 from decision.llm_schemas import (
     LLMCriterionAssessmentResponse,
@@ -598,7 +598,9 @@ class DecisionAgent:
                         "reason": reason
                     })
                 except Exception as exc:
-                    return DecisionResponse(
+                    # Same informational-only confidence mechanism as
+                    # make_decision(); the fail-closed outcome/routing is unchanged.
+                    return attach_confidence_metrics(DecisionResponse(
                         case_id=claim.case_data.case_id,
                         outcome=DecisionOutcome.HUMAN_REVIEW,
                         reasoning=["Engine Fail-Closed Triggered.", "Invalid criterion-assessment LLM response."],
@@ -611,7 +613,7 @@ class DecisionAgent:
                         policy_id=policy_id,
                         submission_attempt=submission_attempt,
                         reason_code=DecisionReasonCode.LLM_ASSESSMENT_FAIL_CLOSED,
-                    )
+                    ))
             
             if legacy_mode:
                 assessments.extend(legacy_assessments)
@@ -847,7 +849,9 @@ class DecisionAgent:
                 err_msg = f"LLM Layer failed: {str(e)}"
                 errors.append(err_msg)
                 
-                return DecisionResponse(
+                # Same informational-only confidence mechanism as
+                # make_decision(); the fail-closed outcome/routing is unchanged.
+                return attach_confidence_metrics(DecisionResponse(
                     case_id=case_data.case_id,
                     outcome=DecisionOutcome.HUMAN_REVIEW,
                     reasoning=[
@@ -860,7 +864,7 @@ class DecisionAgent:
                     evidence_status={},
                     errors=errors,
                     reason_code=DecisionReasonCode.LLM_ASSESSMENT_FAIL_CLOSED,
-                )
+                ))
 
         # 6. Fallback or transition to the deterministic decision engine
         resp = make_decision(

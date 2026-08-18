@@ -15,6 +15,8 @@ import { getClaimDetails } from '../../services/claimsApi';
 import { PolicyModal } from '../../components/shared/PolicyModal';
 import { HumanReviewWorkspace } from '../../components/shared/HumanReviewWorkspace';
 import { HospitalHumanResolutionPanel } from '../../components/hospital/HospitalHumanResolutionPanel';
+import { PriorAuthStatusCard } from '../../components/shared/PriorAuthStatusCard';
+import { AgentConfidenceCard } from '../../components/shared/AgentConfidenceCard';
 import { decisionLabel } from '../../utils/decisionHumanizer';
 import { usePolling, isTerminalStatus } from '../../services/polling';
 import type { ClaimDetails, ClaimVersion } from '../../types/claim';
@@ -68,6 +70,9 @@ export function HospitalClaimDetails() {
     SUBMITTED: { icon: Loader2, title: 'Claim Received', msg: 'Processing documents… Average wait: 2–3 minutes.', cls: 'bg-violet-50 border-violet-200', iconCls: 'text-violet-600' },
     UNDER_REVIEW: { icon: Loader2, title: 'Under Review', msg: 'Policy criteria under review…', cls: 'bg-violet-50 border-violet-200', iconCls: 'text-violet-600' },
     ACCEPTED: { icon: CheckCircle2, title: 'APPROVE', msg: claim.decision?.reason || '', cls: 'bg-emerald-50 border-emerald-200', iconCls: 'text-emerald-600' },
+    // Phase 4: terminal REJECT only exists AFTER human verification completes
+    // (Phase 3 routing), so this banner can never precede the resolution.
+    REJECTED: { icon: AlertTriangle, title: 'REJECT', msg: claim.decision?.reason || '', cls: 'bg-red-50 border-red-200', iconCls: 'text-red-600' },
     MORE_INFO: { icon: AlertTriangle, title: 'REQUEST MORE INFORMATION', msg: claim.decision?.reason || '', cls: 'bg-amber-50 border-amber-200', iconCls: 'text-amber-600' },
     HUMAN_REVIEW: { icon: Users, title: 'HUMAN REVIEW', msg: claim.decision?.reason || '', cls: 'bg-blue-50 border-blue-200', iconCls: 'text-blue-600' },
     RESUBMISSION_CHECK: { icon: Shield, title: 'Resubmission Under Analysis', msg: 'Checking all criteria for resubmission eligibility…', cls: 'bg-indigo-50 border-indigo-200', iconCls: 'text-indigo-600' },
@@ -329,6 +334,10 @@ export function HospitalClaimDetails() {
         {/* Right column */}
         <div className="space-y-5">
           {claim.timeline && <ClaimTimeline events={claim.timeline} portal="hospital" />}
+
+          {/* Phase 4: persisted Phase 1 pre-check + Phase 2 confidence, read from the authoritative claim record */}
+          <PriorAuthStatusCard claim={claim} portal="hospital" />
+          <AgentConfidenceCard claim={claim} />
 
           {/* Policy Reference Card */}
           <Card className="animate-fade-in-up stagger-2">

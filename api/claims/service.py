@@ -16,7 +16,8 @@ This service:
     storage can later replace SQLite without touching workflow logic.
 
 Frozen semantics preserved end-to-end:
-  APPROVE -> terminal | REJECT -> terminal |
+  APPROVE -> terminal | REJECT -> held in HUMAN_REVIEW for human
+  cross-verification (Phase 3; original rejection immutable) | 
   REQUEST_MORE_INFORMATION -> Agent2 | HUMAN_REVIEW -> human resolution ->
   normal Agent1 routing (never direct recovery).
 """
@@ -87,13 +88,20 @@ class ClaimService:
         self.simulation_service_locator = simulation_service_locator
 
     def _owning_service(self, claim_id: str):
-        """Return the ClaimService owning claim_id, or raise ClaimNotFound."""
-        if self.claim_store.get(claim_id) is not None:
-            return self
+        """Return the ClaimService owning claim_id, or raise ClaimNotFound.
+
+        The simulation locator is consulted FIRST: with shared persistent
+        claim stores the main service's claim_store also sees simulation
+        claims, but their authoritative workflow/control-plane state lives in
+        the owning simulation run's service. Routing them there keeps every
+        read/resolve on one control plane (no divergent live views).
+        """
         if self.simulation_service_locator is not None:
             owner = self.simulation_service_locator(claim_id)
-            if owner is not None:
+            if owner is not None and owner is not self:
                 return owner
+        if self.claim_store.get(claim_id) is not None:
+            return self
         raise ClaimNotFound(claim_id)
 
     # -- create / read ------------------------------------------------------
@@ -231,6 +239,7 @@ class ClaimService:
         claim_id: str,
         resolution_note: str = "",
         attached_evidence: Optional[List[Dict[str, Any]]] = None,
+        resolved_by: str = "hospital",
     ) -> Dict[str, Any]:
         owner = self._owning_service(claim_id)
         if owner is not self:
@@ -238,6 +247,14 @@ class ClaimService:
                 claim_id,
                 resolution_note=resolution_note,
                 attached_evidence=attached_evidence,
+                resolved_by=resolved_by,
+            )
+        # Phase 3: the Hospital portal is the ONLY side allowed to resolve a
+        # human review; Insurance stays strictly read-only for this state.
+        if str(resolved_by or "").strip().lower() != "hospital":
+            raise PermissionError(
+                "Only the hospital portal may resolve a human review; the "
+                "insurance portal is read-only for HUMAN_REVIEW claims."
             )
         record = self._require_claim(claim_id)
         if self.components is None:
@@ -333,8 +350,19 @@ class ClaimService:
             "resubmissions": result.resubmissions,
             "human_review_required": result.human_review_required,
             "human_review_reasons": list(result.human_review_reasons),
+            # Phase 3 human verification of Agent1 REJECT: pending flag,
+            # immutable original rejection snapshot, and the applied human
+            # resolution (None until the hospital resolves the hold).
+            "human_verification_pending": bool(
+                getattr(result, "human_verification_pending", False)
+            ),
+            "original_rejection": getattr(result, "original_rejection", None),
+            "human_resolution": getattr(result, "human_resolution", None),
             "sensitive_blocked": result.sensitive_blocked,
             "provider_declined": result.provider_declined,
+            # Phase 1: deterministic prior-auth pre-check outcome recorded on
+            # the control plane before Agent 1 (explainable, additive field).
+            "prior_auth_precheck": getattr(result, "prior_auth_precheck", None),
             "evidence_request": erq,
             "recovery_result": serialize_recovery_result(result.recovery_result),
             "latest_submission_id": submissions[-1]["submission_id"] if submissions else None,

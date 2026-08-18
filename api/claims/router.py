@@ -103,9 +103,13 @@ def build_claims_router(service: ClaimService) -> APIRouter:
                 claim_id,
                 resolution_note=payload.resolution_note,
                 attached_evidence=payload.attached_evidence,
+                resolved_by=payload.resolved_by,
             )
         except ClaimNotFound:
             raise HTTPException(status_code=404, detail=f"Claim not found: {claim_id}")
+        except PermissionError as exc:
+            # Phase 3: hospital-only resolution; insurance is read-only.
+            raise HTTPException(status_code=403, detail=str(exc))
         except IllegalWorkflowTransition as exc:
             raise HTTPException(status_code=409, detail=str(exc))
         except ValueError as exc:

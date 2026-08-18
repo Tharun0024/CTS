@@ -11,6 +11,7 @@ import type {
   ClaimStatus,
   DecisionStatus,
   EvidenceRequestStatus,
+  OriginalRejection,
   PolicyEvidenceItem,
   ResubmissionStatus,
   TimelineEvent,
@@ -51,11 +52,26 @@ export interface BackendRecord {
     criteria_evaluations?: Record<string, any>;
     referenced_evidence_ids?: string[];
     criterion_assessments?: Record<string, any>;
+    // Phase 2: informational-only Agent1 confidence metrics.
+    confidence_score?: number | null;
+    confidence_level?: string | null;
+    confidence_factors?: string[];
   } | null;
   agent2_invoked?: boolean;
   resubmissions?: number;
   human_review_required?: boolean;
   human_review_reasons?: string[];
+  // Phase 3: human cross-verification of an Agent1 REJECT.
+  human_verification_pending?: boolean;
+  human_resolution?: string | null;
+  original_rejection?: OriginalRejection | null;
+  // Phase 1: deterministic prior-auth pre-check outcome (display-only).
+  prior_auth_precheck?: {
+    requires_prior_auth?: boolean;
+    matched_rule?: string;
+    reason?: string;
+    policy_reference?: string | null;
+  } | null;
   sensitive_blocked?: boolean;
   provider_declined?: boolean;
   evidence_request?: {
@@ -356,6 +372,9 @@ export function toClaimDetails(record: BackendRecord): ClaimDetails {
           criteria_evaluations: decision.criteria_evaluations,
           referenced_evidence_ids: decision.referenced_evidence_ids,
           criterion_assessments: decision.criterion_assessments,
+          confidence_score: decision.confidence_score ?? null,
+          confidence_level: decision.confidence_level ?? null,
+          confidence_factors: decision.confidence_factors ?? [],
         }
       : null,
     policy_evidence: mapPolicyEvidence(record),
@@ -413,6 +432,11 @@ export function toClaimDetails(record: BackendRecord): ClaimDetails {
     })),
     provider_decisions: record.provider_decisions ?? [],
     simulation_id: record.simulation_id,
+    // Phase 3: human cross-verification of an Agent1 REJECT.
+    human_verification_pending: record.human_verification_pending ?? false,
+    human_resolution: record.human_resolution ?? null,
+    original_rejection: record.original_rejection ?? null,
+    prior_auth_precheck: record.prior_auth_precheck ?? null,
   };
 }
 

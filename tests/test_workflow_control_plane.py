@@ -176,7 +176,7 @@ class TestPipelineLifecycleStates:
         re_eval = [e for e in cp.events("CLM-P4-FLAG") if e.action.startswith("Agent1 re-evaluating")]
         assert len(re_eval) == 1 and re_eval[0].claim_version == 2
 
-    def test_terminal_reject_never_enters_recovery_states(self, p4_registry):
+    def test_reject_holds_in_human_review_and_never_enters_recovery_states(self, p4_registry):
         chunks = [_chunk("POL-P4-HARD", "C01", "Diagnosis documentation required.")]
         exclusions = [{
             "exclusion_id": "EX-AGE",
@@ -192,12 +192,17 @@ class TestPipelineLifecycleStates:
             claim, components, recovery_source=_pool_source([]), control_plane=cp
         )
 
+        # Phase 3: Agent1 REJECT stays the engine outcome but is held in
+        # HUMAN_REVIEW for human cross-verification (never immediately terminal).
         assert result.final_outcome == DecisionOutcome.REJECT
-        assert cp.current_state("CLM-P4-HARD") == ClaimWorkflowState.REJECTED
+        assert result.human_verification_pending is True
+        assert cp.current_state("CLM-P4-HARD") == ClaimWorkflowState.HUMAN_REVIEW
         states = _states_after(cp, "CLM-P4-HARD")
-        assert states == ["RECEIVED", "EVALUATING", "REJECTED"]
-        # No recovery state was ever recorded for a terminal REJECT.
+        assert states == ["RECEIVED", "EVALUATING", "HUMAN_REVIEW"]
+        # No recovery state was ever recorded for a REJECT.
         assert not {"ROUTED_RECOVERY", "RECOVERING", "RESUBMITTING"} & set(states)
+        # No terminal status is reached before human verification completes.
+        assert "REJECTED" not in states
 
     def test_missing_evidence_ends_in_human_review_hold(self, p4_registry):
         chunks = [_chunk("POL-P4-MISS", "C-MET", "Documented metformin trial required.")]

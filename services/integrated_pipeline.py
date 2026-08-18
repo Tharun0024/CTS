@@ -9,6 +9,11 @@ from adapters.runtime_adapter import RuntimeAdapter
 from rag.normalization.input_normalizer import normalize_claim_input
 from decision.schemas import DecisionResponse, DecisionOutcome, DecisionReasonCode
 from decision.agent import DecisionAgent
+from decision.decision_logic import attach_confidence_metrics
+
+# Phase 1: deterministic prior-authorization pre-check BEFORE Agent 1.
+# Pure explicit rule engine: no LLM and no patient/EHR data access.
+from services.prior_auth_precheck import run_prior_auth_precheck
 
 def run_integrated_pipeline(canonical_claim: Dict[str, Any], components: Dict[str, Any]) -> Any:
     """
@@ -192,7 +197,9 @@ def run_integrated_pipeline(canonical_claim: Dict[str, Any], components: Dict[st
         
         if not rag_policy.get("criteria"):
             # Safe fallback: no policy criteria matched or RAG failure occurred. Fail closed to HUMAN_REVIEW (Constraint 9 & 12)
-            return DecisionResponse(
+            # Same informational-only confidence mechanism as make_decision();
+            # the fail-closed outcome/routing is unchanged.
+            return attach_confidence_metrics(DecisionResponse(
                 case_id=canonical_claim.get("claim_id") or "UNKNOWN-CLAIM",
                 outcome=DecisionOutcome.HUMAN_REVIEW,
                 reasoning=["RAG retrieval failed or found no matching policy criteria. Escalating to HUMAN_REVIEW (fail-closed)."],
@@ -203,7 +210,7 @@ def run_integrated_pipeline(canonical_claim: Dict[str, Any], components: Dict[st
                 errors=["RAG failed to retrieve any criteria for the requested procedures."],
                 claim_id=canonical_claim.get("claim_id"),
                 reason_code=DecisionReasonCode.NO_MATCHING_POLICY,
-            )
+            ))
         
         # 5. Execute Agent 1 Decision logic (Constraint 14 & 15)
         agent = DecisionAgent(
@@ -241,7 +248,9 @@ def run_integrated_pipeline(canonical_claim: Dict[str, Any], components: Dict[st
     except Exception as e:
         # Catch-all safe fail-closed: return DecisionResponse with HUMAN_REVIEW outcome (Constraint 9)
         print(f"[RAG Integration] Critical error in integrated pipeline: {e}")
-        return DecisionResponse(
+        # Same informational-only confidence mechanism as make_decision();
+        # the fail-closed outcome/routing is unchanged.
+        return attach_confidence_metrics(DecisionResponse(
             case_id=canonical_claim.get("claim_id") or "UNKNOWN-CLAIM",
             outcome=DecisionOutcome.HUMAN_REVIEW,
             reasoning=["Integrated pipeline catch-all error fallback.", f"Error details: {e}"],
@@ -252,7 +261,7 @@ def run_integrated_pipeline(canonical_claim: Dict[str, Any], components: Dict[st
             errors=[f"Integrated pipeline critical error: {e}"],
             claim_id=canonical_claim.get("claim_id"),
             reason_code=DecisionReasonCode.PIPELINE_FAIL_CLOSED,
-        )
+        ))
 
 
 def run_pipeline_from_db(
@@ -272,7 +281,9 @@ def run_pipeline_from_db(
     linked_claim = rt.get_linked_runtime_claim(patient_id, claim_id, attempt)
 
     if linked_claim is None:
-        return DecisionResponse(
+        # Same informational-only confidence mechanism as make_decision();
+        # the fail-closed outcome/routing is unchanged.
+        return attach_confidence_metrics(DecisionResponse(
             case_id=claim_id or patient_id or "UNKNOWN-CLAIM",
             outcome=DecisionOutcome.HUMAN_REVIEW,
             reasoning=[
@@ -286,7 +297,7 @@ def run_pipeline_from_db(
             errors=["Provider claim or payer context not found in V1 databases."],
             claim_id=claim_id,
             reason_code=DecisionReasonCode.PROVIDER_CLAIM_NOT_FOUND,
-        )
+        ))
 
     return run_integrated_pipeline(linked_claim, components)
 
@@ -593,6 +604,18 @@ class Agent2V1Result:
     provider_declined: bool = False
     # Phase 4 control plane: enforced lifecycle states + immutable audit trail.
     control_plane: Optional[Any] = None
+    # Phase 1: deterministic prior-auth pre-check outcome (explainable dict:
+    # requires_prior_auth, matched_rule, reason, policy_reference, source).
+    prior_auth_precheck: Optional[Dict[str, Any]] = None
+    # Phase 3 human verification: an Agent1 REJECT is no longer immediately
+    # terminal. ``human_verification_pending`` marks the HUMAN_REVIEW hold for
+    # human cross-verification; ``original_rejection`` is the immutable
+    # snapshot of the original Agent1 rejection (outcome, reason_code,
+    # reasoning, confidence metrics); ``human_resolution`` records the applied
+    # authoritative human resolution note once the hold is resolved.
+    human_verification_pending: bool = False
+    original_rejection: Optional[Dict[str, Any]] = None
+    human_resolution: Optional[str] = None
 
 
 def _default_recovery_source_factory(adapter: Optional[RuntimeAdapter] = None):
@@ -607,6 +630,37 @@ def _default_recovery_source_factory(adapter: Optional[RuntimeAdapter] = None):
     return source
 
 
+def _snapshot_rejection(decision: DecisionResponse) -> Dict[str, Any]:
+    """Immutable snapshot of an original Agent1 rejection (Phase 3).
+
+    Captured BEFORE any human resolution is applied, so the original decision,
+    reasoning and confidence metrics stay auditable even after the human
+    cross-verification resolves the hold.
+    """
+    return {
+        "outcome": decision.outcome.value,
+        "reason_code": decision.reason_code.value if decision.reason_code else None,
+        "reasoning": list(decision.reasoning or []),
+        "confidence_score": getattr(decision, "confidence_score", None),
+        "confidence_level": getattr(decision, "confidence_level", None),
+        "confidence_factors": list(getattr(decision, "confidence_factors", None) or []),
+    }
+
+
+def _latest_human_resolution_note(cp, claim_id: str) -> Optional[str]:
+    """Latest RESOLVED_REENTRY note carrying an explicit human decision, if any."""
+    from agent2.workflow.control_plane import ClaimWorkflowState
+
+    for event in reversed(cp.events(claim_id)):
+        if event.state_after == ClaimWorkflowState.RESOLVED_REENTRY and event.detail:
+            if (
+                "Human review decision: APPROVE" in event.detail
+                or "Human review decision: REJECT" in event.detail
+            ):
+                return event.detail
+    return None
+
+
 def run_agent2_v1_pipeline(
     canonical_claim: Dict[str, Any],
     components: Dict[str, Any],
@@ -615,6 +669,7 @@ def run_agent2_v1_pipeline(
     provider_decision: str = "ACCEPT",
     control_plane=None,
     persist_workflow_db: bool = False,
+    prior_auth_registry: Optional[List[Dict[str, Any]]] = None,
 ) -> Agent2V1Result:
     """Run the real V1 pipeline with Agent 2 evidence recovery integrated.
 
@@ -635,12 +690,13 @@ def run_agent2_v1_pipeline(
     escalates to HUMAN_REVIEW (Agent 2 never overrides provider consent).
 
     Phase 4 control plane: every important state/action transition is enforced
-    against the frozen lifecycle (RMI is the only recovery route; REJECT and
-    APPROVE are terminal; HUMAN_REVIEW can never enter recovery directly) and
-    recorded as an immutable audit event carrying correlation_id and
-    evidence_request_id. Pass ``control_plane`` to share state across runs
-    (e.g. human-resolution re-entry); ``persist_workflow_db=True`` also writes
-    events/provider decisions to the agent2 SQLite database.
+    against the frozen lifecycle (RMI is the only recovery route; APPROVE is
+    terminal; REJECT is held in HUMAN_REVIEW for human cross-verification
+    (Phase 3) and never routes to Agent 2; HUMAN_REVIEW can never enter
+    recovery directly) and recorded as an immutable audit event carrying
+    correlation_id and evidence_request_id. Pass ``control_plane`` to share
+    state across runs (e.g. human-resolution re-entry); ``persist_workflow_db=True``
+    also writes events/provider decisions to the agent2 SQLite database.
     """
     from agent2.config import MAX_RESUBMISSION_ATTEMPTS
     from agent2.reasoning.rejection_analyzer import RejectionAnalyzer
@@ -661,6 +717,9 @@ def run_agent2_v1_pipeline(
     evidence_request: Optional[Any] = None
     recovery_result: Optional[Any] = None
     provider_declined = False
+    human_verification_pending = False
+    original_rejection: Optional[Dict[str, Any]] = None
+    human_resolution: Optional[str] = None
 
     analyzer = RejectionAnalyzer()
 
@@ -684,7 +743,36 @@ def run_agent2_v1_pipeline(
     current_claim = deepcopy(canonical_claim)
     if cp.current_state(wf_claim_id) == ClaimWorkflowState.INIT:
         wf_transition(ClaimWorkflowState.RECEIVED, "Claim received for Agent1 evaluation", version=1 + wf_version_offset)
-    wf_transition(ClaimWorkflowState.EVALUATING, f"Agent1 evaluating V{1 + wf_version_offset}", version=1 + wf_version_offset)
+
+    # Phase 1: deterministic prior-auth pre-check BEFORE Agent 1 (no LLM, no
+    # patient/EHR access; backed by the existing policy/benefit data). Both
+    # outcomes stay on the SAME frozen V1 path -- no parallel pipeline:
+    #   requires_prior_auth=True  -> the claim is explicitly marked as
+    #       prior-auth-required on the control plane and proceeds through the
+    #       existing authorization/review workflow (RAG -> Agent 1 -> frozen
+    #       routing incl. Agent 2 recovery and human review).
+    #   requires_prior_auth=False -> routed directly to the existing Agent 1
+    #       V1 evaluation with no behavior change.
+    precheck_registry = (
+        prior_auth_registry
+        if prior_auth_registry is not None
+        else (components.get("all_chunks") or None)
+    )
+    precheck = run_prior_auth_precheck(current_claim, policy_records=precheck_registry)
+    cp.record_prior_auth_precheck(wf_claim_id, precheck, claim_version=1 + wf_version_offset)
+    audit.append(
+        "PriorAuth pre-check: "
+        f"requires_prior_auth={str(precheck.requires_prior_auth).lower()} "
+        f"matched_rule={precheck.matched_rule} "
+        f"policy_reference={precheck.policy_reference or 'none'}"
+    )
+
+    wf_transition(
+        ClaimWorkflowState.EVALUATING,
+        f"Agent1 evaluating V{1 + wf_version_offset}",
+        version=1 + wf_version_offset,
+        detail=precheck.to_detail_line(),
+    )
     decision = run_integrated_pipeline(current_claim, components)
     versions.append({
         "version": "V1",
@@ -722,6 +810,7 @@ def run_agent2_v1_pipeline(
                         final_outcome_override = DecisionOutcome.APPROVE
                         decision.outcome = DecisionOutcome.APPROVE
                         decision.reasoning.append(note)
+                        human_resolution = note
                         if hasattr(DecisionReasonCode, 'HUMAN_DECISION'):
                             decision.reason_code = DecisionReasonCode.HUMAN_DECISION
                         break
@@ -734,6 +823,7 @@ def run_agent2_v1_pipeline(
                         final_outcome_override = DecisionOutcome.REJECT
                         decision.outcome = DecisionOutcome.REJECT
                         decision.reasoning.append(note)
+                        human_resolution = note
                         if hasattr(DecisionReasonCode, 'HUMAN_DECISION'):
                             decision.reason_code = DecisionReasonCode.HUMAN_DECISION
                         break
@@ -746,15 +836,59 @@ def run_agent2_v1_pipeline(
                     detail="; ".join(decision.reasoning[-2:]) if decision.reasoning else None,
                 )
             else:
-                audit.append(
-                    "Routing: REJECT is terminal (hard denial / coverage exclusion); "
-                    "no Agent2 recovery."
-                )
-                wf_transition(
-                    ClaimWorkflowState.REJECTED,
-                    "Agent1 REJECT: terminal, no Agent2 recovery",
-                    detail=str(decision.reason_code.value if decision.reason_code else ""),
-                )
+                # Phase 3: an Agent1 REJECT is no longer immediately
+                # final/unreviewable. The original rejection decision and
+                # reasoning are preserved immutably (version snapshot +
+                # original_rejection) and the claim is routed into the
+                # EXISTING HUMAN_REVIEW mechanism for human cross-verification.
+                # If this re-entry cycle already carries an authoritative human
+                # resolution ("Human review decision: APPROVE/REJECT"), it
+                # resolves the verification straight into the matching terminal
+                # state through the existing authoritative path.
+                resolution_note = _latest_human_resolution_note(cp, wf_claim_id)
+                if resolution_note:
+                    human_approved = "Human review decision: APPROVE" in resolution_note
+                    human_resolution = resolution_note
+                    original_rejection = _snapshot_rejection(decision)
+                    wf_transition(
+                        ClaimWorkflowState.APPROVED if human_approved else ClaimWorkflowState.REJECTED,
+                        (
+                            "Human reviewer approved"
+                            if human_approved
+                            else "Human reviewer rejected"
+                        )
+                        + " the claim after cross-verification of Agent1 REJECT",
+                        detail=resolution_note,
+                    )
+                    audit.append(
+                        "Routing: human cross-verification resolved Agent1 REJECT -> "
+                        f"{'APPROVED' if human_approved else 'REJECTED'} (authoritative human decision)."
+                    )
+                    final_outcome_override = (
+                        DecisionOutcome.APPROVE if human_approved else DecisionOutcome.REJECT
+                    )
+                    decision.outcome = final_outcome_override
+                    decision.reasoning.append(resolution_note)
+                    decision.reason_code = DecisionReasonCode.HUMAN_DECISION
+                else:
+                    human_verification_pending = True
+                    original_rejection = _snapshot_rejection(decision)
+                    human_review_reasons.append(
+                        "Human Verification Required: Agent1 decision REJECT is held for "
+                        "human cross-verification before any terminal status."
+                    )
+                    audit.append(
+                        "Routing: Agent1 REJECT routed to HUMAN_REVIEW for human "
+                        "cross-verification (original rejection preserved; no Agent2 recovery)."
+                    )
+                    wf_transition(
+                        ClaimWorkflowState.HUMAN_REVIEW,
+                        "Agent1 REJECT held for human cross-verification (Human Verification Required)",
+                        detail=(
+                            "Human Verification Required | original REJECT reason="
+                            f"{decision.reason_code.value if decision.reason_code else 'UNKNOWN'}"
+                        ),
+                    )
             break
 
         wf_transition(
@@ -966,7 +1100,9 @@ def run_agent2_v1_pipeline(
         current_claim = next_claim
 
     final_outcome = final_outcome_override or decision.outcome
-    human_review_required = final_outcome == DecisionOutcome.HUMAN_REVIEW
+    human_review_required = (
+        final_outcome == DecisionOutcome.HUMAN_REVIEW or human_verification_pending
+    )
     return Agent2V1Result(
         final_outcome=final_outcome,
         final_decision=decision,
@@ -982,6 +1118,10 @@ def run_agent2_v1_pipeline(
         recovery_result=recovery_result,
         provider_declined=provider_declined,
         control_plane=cp,
+        prior_auth_precheck=precheck.to_dict(),
+        human_verification_pending=human_verification_pending,
+        original_rejection=original_rejection,
+        human_resolution=human_resolution,
     )
 
 
@@ -1062,7 +1202,9 @@ def run_agent2_pipeline_from_db(
     linked_claim = rt.get_linked_runtime_claim(patient_id, claim_id, attempt)
 
     if linked_claim is None:
-        fallback = DecisionResponse(
+        # Same informational-only confidence mechanism as make_decision();
+        # the fail-closed outcome/routing is unchanged.
+        fallback = attach_confidence_metrics(DecisionResponse(
             case_id=claim_id or patient_id or "UNKNOWN-CLAIM",
             outcome=DecisionOutcome.HUMAN_REVIEW,
             reasoning=[
@@ -1075,7 +1217,7 @@ def run_agent2_pipeline_from_db(
             evidence_status={},
             errors=["Provider claim or payer context not found in V1 databases."],
             claim_id=claim_id,
-        )
+        ))
         return Agent2V1Result(
             final_outcome=DecisionOutcome.HUMAN_REVIEW,
             final_decision=fallback,

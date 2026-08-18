@@ -86,6 +86,10 @@ export interface ClaimDecision {
   criteria_evaluations?: Record<string, any>;
   referenced_evidence_ids?: string[];
   criterion_assessments?: Record<string, any>;
+  // Phase 2: informational-only Agent1 decision confidence (never changes the decision).
+  confidence_score?: number | null;
+  confidence_level?: string | null;
+  confidence_factors?: string[];
 }
 
 export interface ClaimDetails {
@@ -144,6 +148,29 @@ export interface ClaimDetails {
   versions?: ClaimVersion[];
   provider_decisions?: ProviderDecisionRecord[];
   simulation_id?: string;
+  // Phase 3: human cross-verification of an Agent 1 REJECT. The claim stays
+  // in HUMAN_REVIEW (never REJECTED) until the hospital resolves it.
+  human_verification_pending?: boolean;
+  human_resolution?: string | null;
+  original_rejection?: OriginalRejection | null;
+  // Phase 1: deterministic prior-auth pre-check outcome (display-only).
+  prior_auth_precheck?: {
+    requires_prior_auth?: boolean;
+    matched_rule?: string;
+    reason?: string;
+    policy_reference?: string | null;
+  } | null;
+}
+
+// Immutable snapshot of the original Agent 1 rejection (auditable; never
+// altered by the human resolution).
+export interface OriginalRejection {
+  outcome?: string;
+  reason_code?: string | null;
+  reasoning?: string[];
+  confidence_score?: number | null;
+  confidence_level?: string | null;
+  confidence_factors?: string[];
 }
 
 // Agent2 recovery result as serialized by the backend (FOUND | MISSING only).

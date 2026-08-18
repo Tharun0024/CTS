@@ -35,7 +35,139 @@ def _collect_referenced_evidence_ids(
     return ids
 
 
+# ---------------------------------------------------------------------------
+# Phase 2 — informational-only decision confidence metrics.
+#
+# Derived AFTER the deterministic decision, exclusively from existing engine
+# outputs (criterion states, evidence provenance confidence scores, evidence
+# quality statuses, reason codes, errors). No LLM call, no fabricated score,
+# and no influence whatsoever on outcome/reason_code/routing.
+# ---------------------------------------------------------------------------
+
+_FAIL_CLOSED_REASON_CODES = {
+    DecisionReasonCode.UNKNOWN_PAYER,
+    DecisionReasonCode.POLICY_VALIDATION_ERROR,
+    DecisionReasonCode.LLM_ASSESSMENT_FAIL_CLOSED,
+    DecisionReasonCode.ENGINE_FAIL_CLOSED,
+    DecisionReasonCode.NO_MATCHING_POLICY,
+    DecisionReasonCode.PIPELINE_FAIL_CLOSED,
+    DecisionReasonCode.PROVIDER_CLAIM_NOT_FOUND,
+}
+
+# Deterministic per-state confidence contributions (certainty of the engine's
+# own conclusion, grounded in how each state was resolved).
+_STATE_CONFIDENCE = {
+    "PASS": 1.0,
+    "NOT_APPLICABLE": 1.0,
+    "FAIL": 0.9,          # definitive failure on present data
+    "MISSING": 0.7,       # absence is deterministic, outcome awaits data
+    "CONFLICTING": 0.3,   # contradictory facts cannot be resolved deterministically
+}
+
+_QUALITY_ALERT_STATUSES = {"contradictory", "ambiguous", "unverified", "low_confidence", "failed_validation"}
+
+
+def _confidence_level(score: float) -> str:
+    if score >= 0.8:
+        return "HIGH"
+    if score >= 0.5:
+        return "MEDIUM"
+    return "LOW"
+
+
+def attach_confidence_metrics(response: DecisionResponse) -> DecisionResponse:
+    """Populate the informational-only confidence fields on a DecisionResponse.
+
+    Pure post-processing: reads only fields the deterministic engine already
+    produced, then mutates nothing else. Never raises.
+    """
+    try:
+        factors: List[str] = []
+        reason_code = response.reason_code
+
+        if reason_code in _FAIL_CLOSED_REASON_CODES or response.errors:
+            score = 0.1
+            factors.append(
+                f"Fail-closed path ({reason_code.value if hasattr(reason_code, 'value') else reason_code}): "
+                "no deterministic criterion evaluation was available for this decision."
+            )
+        elif not response.criteria_evaluations:
+            score = 0.2
+            factors.append("No criterion evaluations were produced for this decision.")
+        else:
+            state_counts: Dict[str, int] = {}
+            for evaluation in response.criteria_evaluations.values():
+                state_counts[evaluation.state] = state_counts.get(evaluation.state, 0) + 1
+            bases = [
+                _STATE_CONFIDENCE.get(state, 0.3) for state in state_counts
+                for _ in range(state_counts[state])
+            ]
+            base = sum(bases) / len(bases)
+            for state, count in sorted(state_counts.items()):
+                factors.append(f"Criterion state {state}: {count} criterion(s).")
+
+            # Evidence-grounded component: mean confidence of the provenance
+            # items the engine actually traced (missing traces excluded).
+            confidences = [
+                prov.confidence_score
+                for evaluation in response.criteria_evaluations.values()
+                for prov in evaluation.evidence_provenance
+                if prov.evaluation_status != "missing"
+            ]
+            if confidences:
+                avg_evidence = sum(confidences) / len(confidences)
+                score = 0.6 * base + 0.4 * avg_evidence
+                factors.append(
+                    f"Average grounded evidence confidence: {avg_evidence:.2f} "
+                    f"across {len(confidences)} provenance item(s)."
+                )
+            else:
+                score = base
+                factors.append("No grounded evidence available for the evaluated criteria.")
+
+            # Small deterministic penalty for evidence quality alerts already
+            # surfaced by the evidence evaluator.
+            alerts = sum(
+                1 for status in response.evidence_status.values()
+                if str(status) in _QUALITY_ALERT_STATUSES
+            )
+            if alerts:
+                penalty = min(0.2, 0.05 * alerts)
+                score -= penalty
+                factors.append(
+                    f"Evidence quality alerts reduce confidence: {alerts} key(s) flagged."
+                )
+
+        score = max(0.0, min(1.0, round(score, 2)))
+        response.confidence_score = score
+        response.confidence_level = _confidence_level(score)
+        response.confidence_factors = factors
+    except Exception:
+        # Confidence is informational only: derivation failure must never
+        # affect the decision itself.
+        response.confidence_score = None
+        response.confidence_level = None
+        response.confidence_factors = []
+    return response
+
+
 def make_decision(
+    policy: Policy,
+    case_data: CaseData,
+    evidence_list: List[EvidenceItem],
+    confidence_threshold: float = 0.7,
+) -> DecisionResponse:
+    """Deterministic Agent1 decision plus informational-only confidence metrics.
+
+    The decision itself is produced exactly as before by ``_make_decision_inner``;
+    confidence metrics are attached afterwards and never alter it.
+    """
+    return attach_confidence_metrics(
+        _make_decision_inner(policy, case_data, evidence_list, confidence_threshold)
+    )
+
+
+def _make_decision_inner(
     policy: Policy,
     case_data: CaseData,
     evidence_list: List[EvidenceItem],

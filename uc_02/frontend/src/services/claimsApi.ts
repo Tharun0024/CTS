@@ -100,13 +100,18 @@ export async function getProviderDecisions(claimId: string): Promise<unknown[]> 
 
 // POST /api/claims/{id}/human-resolution — resolve a HUMAN_REVIEW hold; the
 // claim re-enters normal Agent 1 routing afterwards (frozen V1 semantics).
+// Phase 3: ONLY the hospital portal may resolve; resolved_by marks the caller
+// (the backend rejects any non-hospital resolver).
 export async function resolveHumanReview(
   claimId: string,
   resolutionNote: string
 ): Promise<ClaimDetails> {
   const record = await apiFetch<BackendRecord>(
     `/claims/${encodeURIComponent(claimId)}/human-resolution`,
-    { method: 'POST', body: JSON.stringify({ resolution_note: resolutionNote }) }
+    {
+      method: 'POST',
+      body: JSON.stringify({ resolution_note: resolutionNote, resolved_by: 'hospital' }),
+    }
   );
   const details = toClaimDetails(record);
   lastDetails.set(claimId, details);

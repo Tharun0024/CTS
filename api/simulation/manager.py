@@ -359,11 +359,29 @@ class SimulationManager:
 
         summaries: List[Dict[str, Any]] = []
         active_claims = set()
-        
+
+        # Ownership map: with shared persistent claim stores every run's
+        # service lists ALL claims, so summaries must be attributed through
+        # each simulation record's own patient/claim ledger.
+        owned_by: Dict[str, str] = {}
+        for sim_record in sim_records:
+            for patient in sim_record.get("patients") or []:
+                if patient.get("claim_id"):
+                    owned_by[patient["claim_id"]] = sim_record.get("simulation_id")
+
         # 1. Process active runtimes
         for sim_id, runtime in runtimes:
+            sim_hex = sim_id.replace("SIM-", "")
             for summary in runtime.service.list_claims():
                 cid = summary["claim_id"]
+                owner = owned_by.get(cid)
+                if owner is None:
+                    # In-flight claims persist before the ledger records them;
+                    # claim ids embed the owning simulation's hex.
+                    if sim_hex not in cid:
+                        continue
+                elif owner != sim_id:
+                    continue
                 active_claims.add(cid)
                 record = runtime.service.claim_store.get(cid) or {}
                 canonical = record.get("canonical_claim") or {}
@@ -384,9 +402,13 @@ class SimulationManager:
                 
         # 2. Fallback: Process persisted simulations for non-active ones
         temp_service = self._build_claim_service(SimulatedProviderStore())
+        runtime_sims = {active_sim[0] for active_sim in runtimes}
         for sim_record in sim_records:
             sim_id = sim_record.get("simulation_id")
-            if any(sim_id == active_sim[0] for active_sim in runtimes):
+            if sim_id in runtime_sims:
+                # Runs that still own a runtime were already listed above;
+                # with shared persistent stores this branch would otherwise
+                # emit the same claims a second time.
                 continue
             for summary in temp_service.list_claims():
                 cid = summary["claim_id"]

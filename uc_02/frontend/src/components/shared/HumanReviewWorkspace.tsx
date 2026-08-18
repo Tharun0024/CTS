@@ -11,6 +11,9 @@ export function HumanReviewWorkspace({ claim, portal = 'hospital' }: HumanReview
   const decision = claim.decision;
   const isAgent2 = !!claim.agent2_invoked;
   const isHospital = portal === 'hospital';
+  // Phase 3: Agent1 REJECT held for human cross-verification.
+  const isHumanVerification = !!claim.human_verification_pending;
+  const originalRejection = claim.original_rejection ?? null;
   const themeCls = isHospital ? 'border-emerald-250 bg-emerald-50/20' : 'border-indigo-250 bg-indigo-50/20';
   const iconColor = isHospital ? 'text-emerald-600' : 'text-indigo-600';
 
@@ -52,7 +55,9 @@ export function HumanReviewWorkspace({ claim, portal = 'hospital' }: HumanReview
         </div>
         <div className="flex-1 space-y-1">
           <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5 flex-wrap">
-            {isAgent2 ? 'Agent 2 Consent & Recovery Hold' : 'Agent 1 Clinical Reentry Hold'}
+            {isHumanVerification
+              ? 'Human Verification Required'
+              : isAgent2 ? 'Agent 2 Consent & Recovery Hold' : 'Agent 1 Clinical Reentry Hold'}
             <span className="text-[10px] font-bold bg-slate-100 border border-slate-200 text-slate-650 px-2 py-0.2 rounded font-mono">
               {reasonCode.replace(/_/g, ' ')}
             </span>
@@ -133,6 +138,148 @@ export function HumanReviewWorkspace({ claim, portal = 'hospital' }: HumanReview
       {!isAgent2 ? (
         /* ==================== AGENT 1 LAYOUT ==================== */
         <div className="space-y-4.5">
+          {/* Phase 3: Human cross-verification of an Agent 1 REJECT */}
+          {isHumanVerification && (
+            <div className="bg-white border-2 border-rose-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-4 py-3 bg-rose-50 border-b border-rose-200 flex items-center justify-between">
+                <h4 className="text-xs font-black uppercase tracking-wider text-rose-800 flex items-center gap-1.5">
+                  <UserCheck className="w-4 h-4 text-rose-600" />
+                  Human Verification Required
+                </h4>
+                <span className="text-[10px] font-black uppercase tracking-widest bg-rose-100 text-rose-700 border border-rose-200 px-2 py-0.5 rounded">
+                  {isHospital ? 'Hospital resolves' : 'Insurance read-only'}
+                </span>
+              </div>
+
+              <div className="p-4 space-y-4">
+                {/* Decision chain: prior auth -> agent 1 -> confidence -> verification -> final */}
+                <div className="flex flex-wrap items-stretch gap-1.5">
+                  {[
+                    {
+                      label: 'Prior Auth Status',
+                      value: claim.prior_auth_precheck
+                        ? (claim.prior_auth_precheck.requires_prior_auth ? 'REQUIRED' : 'NOT REQUIRED')
+                        : 'N/A',
+                      cls: 'bg-slate-50 border-slate-200 text-slate-700',
+                    },
+                    {
+                      label: 'Agent 1 Decision',
+                      value: `${originalRejection?.outcome ?? 'REJECT'}${originalRejection?.reason_code ? ` · ${originalRejection.reason_code}` : ''}`,
+                      cls: 'bg-rose-50 border-rose-200 text-rose-700',
+                    },
+                    {
+                      label: 'Confidence',
+                      value: originalRejection?.confidence_score != null
+                        ? `${Math.round(originalRejection.confidence_score * 100)}% ${originalRejection.confidence_level ?? ''}`.trim()
+                        : 'N/A',
+                      cls: 'bg-amber-50 border-amber-200 text-amber-700',
+                    },
+                    {
+                      label: 'Human Verification',
+                      value: 'REQUIRED · PENDING',
+                      cls: 'bg-blue-50 border-blue-200 text-blue-700',
+                    },
+                    {
+                      label: 'Final Decision',
+                      value: 'Pending human verification',
+                      cls: 'bg-slate-50 border-slate-200 text-slate-500',
+                    },
+                  ].map((step, idx) => (
+                    <div key={step.label} className="flex items-center gap-1.5">
+                      <div className={clsx('border rounded-lg px-2.5 py-1.5 min-w-[110px]', step.cls)}>
+                        <span className="block text-[9px] font-black uppercase tracking-wider opacity-70">{step.label}</span>
+                        <span className="block text-[11px] font-extrabold leading-snug">{step.value}</span>
+                      </div>
+                      {idx < 4 && <span className="text-slate-300 font-black">→</span>}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Immutable original Agent 1 rejection */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                      Original Agent 1 Rejection (immutable audit record)
+                    </span>
+                    <span className="text-[9px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200 px-2 py-0.5 rounded uppercase">
+                      {originalRejection?.outcome ?? 'REJECT'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-bold text-slate-700">
+                    Reason code: <span className="font-mono">{originalRejection?.reason_code ?? 'UNKNOWN'}</span>
+                  </p>
+                  {(originalRejection?.confidence_factors ?? []).length > 0 && (
+                    <ul className="text-[11px] text-slate-600 font-semibold list-disc pl-4 space-y-0.5">
+                      {(originalRejection?.confidence_factors ?? []).map((factor, idx) => (
+                        <li key={idx}>{factor}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <div>
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-1">
+                      Deterministic Reasoning / Evidence Explanation
+                    </span>
+                    <ul className="text-[11px] text-slate-700 font-medium list-disc pl-4 space-y-1 leading-relaxed">
+                      {(originalRejection?.reasoning ?? []).map((line, idx) => (
+                        <li key={idx}>{line}</li>
+                      ))}
+                      {(originalRejection?.reasoning ?? []).length === 0 && (
+                        <li>{decision?.reason || 'No deterministic reasoning recorded.'}</li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-500 font-semibold">
+                  The claim is <span className="font-extrabold text-slate-700">NOT rejected as terminal</span> until the
+                  hospital completes human verification. {isHospital
+                    ? 'Use the resolution panel below to approve or reject.'
+                    : 'Waiting for hospital resolution; this portal is read-only.'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Agent 1 decision confidence (informational only) */}
+          {decision && decision.confidence_score != null && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-2">
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-slate-500" />
+                  Agent 1 Decision Confidence
+                </span>
+                <span className="text-[9px] font-bold text-slate-400 normal-case tracking-normal">
+                  Informational only — never changes the decision
+                </span>
+              </h4>
+              <div className="flex items-center gap-3">
+                <span className="text-xl font-black text-slate-850">
+                  {Math.round(decision.confidence_score * 100)}%
+                </span>
+                <span className={clsx(
+                  'text-[9px] font-extrabold px-2.5 py-0.5 rounded border uppercase tracking-wider',
+                  decision.confidence_level === 'HIGH'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-250'
+                    : decision.confidence_level === 'MEDIUM'
+                      ? 'bg-amber-50 text-amber-700 border-amber-250'
+                      : 'bg-rose-50 text-rose-700 border-rose-250'
+                )}>
+                  {decision.confidence_level || 'N/A'}
+                </span>
+                <span className="font-mono text-[10px] text-slate-500">
+                  score {decision.confidence_score.toFixed(2)}
+                </span>
+              </div>
+              {(decision.confidence_factors || []).length > 0 && (
+                <ul className="text-xs text-slate-600 font-semibold list-disc pl-4 space-y-0.5 leading-relaxed">
+                  {(decision.confidence_factors || []).map((factor, idx) => (
+                    <li key={idx}>{factor}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           {/* RAG Criteria Evaluations */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
             <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">

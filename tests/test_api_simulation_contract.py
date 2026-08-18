@@ -344,9 +344,10 @@ class TestLifecycleAndPipelineReuse:
         # MISSING: real RMI -> Agent2 recovery -> V2 re-evaluation.
         assert patients[1]["decision_outcome"] == "APPROVE"
         assert patients[1]["claim_status"] == "ACCEPTED"
-        # NOT_SATISFIED: real terminal REJECT.
+        # NOT_SATISFIED: real Agent1 REJECT, held for human cross-verification
+        # (Phase 3: never immediately REJECTED).
         assert patients[2]["decision_outcome"] == "REJECT"
-        assert patients[2]["claim_status"] == "REJECTED"
+        assert patients[2]["claim_status"] == "HUMAN_REVIEW"
 
         # The records live in a REAL ClaimService store (Phase 5A contract):
         runtime = manager._runtimes[record["simulation_id"]]

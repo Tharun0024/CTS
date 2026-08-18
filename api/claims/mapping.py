@@ -127,6 +127,12 @@ def serialize_decision(decision: Optional[DecisionResponse]) -> Optional[Dict[st
         "criteria_evaluations": criteria_evals,
         "referenced_evidence_ids": list(getattr(decision, "referenced_evidence_ids", None) or []),
         "criterion_assessments": crit_assessments,
+        # Phase 2: informational-only Agent1 confidence metrics. Serialized here
+        # once, so the stored claim record, every version snapshot, and both the
+        # Hospital and Insurance portals receive identical values.
+        "confidence_score": getattr(decision, "confidence_score", None),
+        "confidence_level": getattr(decision, "confidence_level", None),
+        "confidence_factors": list(getattr(decision, "confidence_factors", None) or []),
     }
 
 

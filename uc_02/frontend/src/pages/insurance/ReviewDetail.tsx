@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { PatientInfoCard } from '../../components/shared/PatientInfoCard';
 import { ClinicalInfoCard } from '../../components/shared/ClinicalInfoCard';
@@ -8,9 +8,12 @@ import { LoadingState } from '../../components/common/LoadingState';
 import { ErrorState } from '../../components/common/ErrorState';
 import { getReviewDetails } from '../../services/reviewApi';
 import { HumanReviewWorkspace } from '../../components/shared/HumanReviewWorkspace';
+import { PriorAuthStatusCard } from '../../components/shared/PriorAuthStatusCard';
 import type { ReviewDetails } from '../../types/claim';
-import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { usePolling, isTerminalStatus } from '../../services/polling';
+import { decisionLabel } from '../../utils/decisionHumanizer';
 
 export function ReviewDetail() {
   const { id } = useParams<{ id: string }>();
@@ -19,16 +22,27 @@ export function ReviewDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const fetchData = () => {
+  const fetchData = useCallback((showLoading = true) => {
     if (!id) return;
-    setLoading(true); setError('');
+    if (showLoading) { setLoading(true); setError(''); }
     getReviewDetails(id)
       .then(setReview)
-      .catch(() => setError('Failed to load review details.'))
-      .finally(() => setLoading(false));
-  };
+      .catch(() => { if (showLoading) setError('Failed to load review details.'); })
+      .finally(() => { if (showLoading) setLoading(false); });
+  }, [id]);
 
-  useEffect(() => { fetchData(); }, [id]);
+  useEffect(() => { fetchData(true); }, [fetchData]);
+
+  // Phase 4: same backend-driven polling pattern as the other detail pages —
+  // the insurance view converges on the hospital's resolution without any
+  // frontend-only state.
+  usePolling(
+    () => getReviewDetails(id!),
+    (data) => setReview(data),
+    (data) => isTerminalStatus(data.claim_details.status),
+    5000,
+    !!id && !!review && !isTerminalStatus(review.claim_details.status)
+  );
 
   if (loading) return (
     <div className="max-w-7xl mx-auto w-full pb-10">
@@ -38,7 +52,7 @@ export function ReviewDetail() {
 
   if (error || !review) return (
     <div className="max-w-7xl mx-auto w-full pb-10">
-      <ErrorState message={error || 'Review not found.'} onRetry={fetchData} />
+      <ErrorState message={error || 'Review not found.'} onRetry={() => fetchData(true)} />
     </div>
   );
 
@@ -88,6 +102,9 @@ export function ReviewDetail() {
             <ClinicalInfoCard claim={claim.claim} />
           </div>
 
+          {/* Phase 4: persisted Phase 1 prior-auth pre-check (same authoritative record) */}
+          <PriorAuthStatusCard claim={claim} portal="insurance" />
+
           {claim.policy_evidence.length > 0 && (
             <PolicyEvidencePanel
               evidence={claim.policy_evidence}
@@ -118,21 +135,43 @@ export function ReviewDetail() {
 
         {/* Right: human review panel + timeline */}
         <div className="space-y-4">
-          {claim.agent2_invoked ? (
-            <div className="bg-amber-50 border border-amber-250 rounded-2xl p-4.5 text-center shadow-sm animate-fade-in-up">
-              <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
-              <p className="text-xs font-black text-amber-900 uppercase tracking-wider">Provider/Hospital Resolution Pending</p>
-              <p className="text-[11px] text-amber-700 mt-1.5 font-semibold leading-relaxed">
-                This claim is held for provider evidence release consent. Waiting for hospital resolution.
-              </p>
-            </div>
+          {/* Phase 4: the pending panel is gated on the live backend status so a
+              stale HUMAN_REVIEW hold can never reappear after the hospital
+              resolves; resolved claims show the terminal decision instead. */}
+          {claim.status === 'HUMAN_REVIEW' ? (
+            claim.agent2_invoked ? (
+              <div className="bg-amber-50 border border-amber-250 rounded-2xl p-4.5 text-center shadow-sm animate-fade-in-up">
+                <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+                <p className="text-xs font-black text-amber-900 uppercase tracking-wider">Provider/Hospital Resolution Pending</p>
+                <p className="text-[11px] text-amber-700 mt-1.5 font-semibold leading-relaxed">
+                  This claim is held for provider evidence release consent. Waiting for hospital resolution.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-blue-50 border border-blue-250 rounded-2xl p-4.5 text-center shadow-sm animate-fade-in-up">
+                <AlertTriangle className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+                <p className="text-xs font-black text-blue-900 uppercase tracking-wider">Hospital Clinical Resolution Pending</p>
+                <p className="text-[11px] text-blue-700 mt-1.5 font-semibold leading-relaxed">
+                  This claim requires manual clinical review and resolution by the hospital provider. The insurance portal is read-only.
+                </p>
+              </div>
+            )
           ) : (
-            <div className="bg-blue-50 border border-blue-250 rounded-2xl p-4.5 text-center shadow-sm animate-fade-in-up">
-              <AlertTriangle className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-              <p className="text-xs font-black text-blue-900 uppercase tracking-wider">Hospital Clinical Resolution Pending</p>
-              <p className="text-[11px] text-blue-700 mt-1.5 font-semibold leading-relaxed">
-                This claim requires manual clinical review and resolution by the hospital provider.
+            <div className={`rounded-2xl border p-4.5 text-center shadow-sm animate-fade-in-up ${claim.status === 'ACCEPTED' ? 'bg-emerald-50 border-emerald-250' : 'bg-red-50 border-red-250'}`}>
+              {claim.status === 'ACCEPTED'
+                ? <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+                : <XCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />}
+              <p className="text-xs font-black uppercase tracking-wider mb-1 text-slate-900">
+                Final Decision: {decisionLabel(claim.decision?.status ?? claim.status)}
               </p>
+              <p className="text-[11px] text-slate-600 font-semibold leading-relaxed">
+                Resolved by the hospital through the authoritative human-resolution workflow.
+              </p>
+              {claim.human_resolution && (
+                <p className="text-[11px] text-slate-700 font-medium bg-white border border-slate-200 rounded-lg p-2 mt-2 text-left leading-relaxed whitespace-pre-wrap">
+                  {claim.human_resolution}
+                </p>
+              )}
             </div>
           )}
           {claim.timeline && <ClaimTimeline events={claim.timeline} />}

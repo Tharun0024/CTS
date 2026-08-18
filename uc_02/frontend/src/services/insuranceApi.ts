@@ -1,11 +1,13 @@
 // Insurance-side API service — Phase 6: wired to the real FastAPI V1 boundary.
 // The insurer portal reads the same backend claim records the hospital sees;
-// the backend is the single source of truth. Human review decisions are
-// recorded via the human-resolution endpoint (frozen V1 semantics: the claim
-// re-enters normal Agent 1 routing — humans never fabricate final outcomes).
+// the backend is the single source of truth.
+//
+// Phase 4: the insurance portal is strictly READ-ONLY for human resolution.
+// No insurance-side decision submission exists; the hospital is the only side
+// allowed to resolve a HUMAN_REVIEW hold (enforced by the backend with 403).
 
-import { getClaimDetails, getClaims, resolveHumanReview } from './claimsApi';
-import type { InsuranceClaim, ClaimDetails, DecisionPayload } from '../types/claim';
+import { getClaimDetails, getClaims } from './claimsApi';
+import type { InsuranceClaim, ClaimDetails } from '../types/claim';
 
 const priorityByStatus: Record<string, InsuranceClaim['priority']> = {
   HUMAN_REVIEW: 'HIGH',
@@ -57,17 +59,4 @@ export async function getInsuranceClaims(): Promise<InsuranceClaim[]> {
 // GET /api/insurance/claims/{id}
 export async function getInsuranceClaimDetails(id: string): Promise<ClaimDetails> {
   return getClaimDetails(id);
-}
-
-// POST /api/insurance/claims/{id}/decision — recorded as a human-resolution
-// note; the backend re-runs Agent 1 routing (frozen V1 authority model).
-export async function submitDecision(
-  claimId: string,
-  payload: DecisionPayload
-): Promise<{ success: boolean; claim_id: string; decision: string }> {
-  const note =
-    `Human review decision: ${payload.decision} (${payload.reason_code}). ` +
-    (payload.comments || payload.reason_code.replace(/_/g, ' '));
-  await resolveHumanReview(claimId, note);
-  return { success: true, claim_id: claimId, decision: payload.decision };
 }

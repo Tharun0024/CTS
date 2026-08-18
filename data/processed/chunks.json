@@ -18,7 +18,7 @@
     "section": "Coverage Criteria",
     "criterion_id": "C01",
     "criterion_type": "medical_necessity",
-    "criterion_name": "Single Chamber and Dual Chamber Permanent Cardiac Pacemakers — medical necessity / coverage criteria",
+    "criterion_name": "Single Chamber and Dual Chamber Permanent Cardiac Pacemakers \u2014 medical necessity / coverage criteria",
     "text": "Covered for non-reversible symptomatic bradycardia caused by sinus node dysfunction and/or second- or third-degree atrioventricular (AV) block; other indications not addressed in the NCD are left to MAC discretion under reasonable-and-necessary rules.",
     "documentation_requirements": [],
     "exclusions": [],
@@ -30,7 +30,7 @@
     },
     "policy_status": "active",
     "effective_date": "2013-08-13",
-    "revision_date": "Not fixed — CMS revises NCDs on an as-needed basis (last change reflected in version 2)",
+    "revision_date": "Not fixed \u2014 CMS revises NCDs on an as-needed basis (last change reflected in version 2)",
     "chunk_type": "medical_necessity"
   },
   {
@@ -52,7 +52,7 @@
     "section": "Key Clinical Thresholds",
     "criterion_id": "C02",
     "criterion_type": "diagnostic_criteria",
-    "criterion_name": "Single Chamber and Dual Chamber Permanent Cardiac Pacemakers — key clinical thresholds",
+    "criterion_name": "Single Chamber and Dual Chamber Permanent Cardiac Pacemakers \u2014 key clinical thresholds",
     "text": "Diagnosis: symptomatic bradycardia; sinus node dysfunction; 2nd/3rd degree AV block.",
     "documentation_requirements": [],
     "exclusions": [],
@@ -64,7 +64,7 @@
     },
     "policy_status": "active",
     "effective_date": "2013-08-13",
-    "revision_date": "Not fixed — CMS revises NCDs on an as-needed basis (last change reflected in version 2)",
+    "revision_date": "Not fixed \u2014 CMS revises NCDs on an as-needed basis (last change reflected in version 2)",
     "chunk_type": "clinical_thresholds"
   },
   {
@@ -86,7 +86,7 @@
     "section": "Coding Reference",
     "criterion_id": "C03",
     "criterion_type": "coding_reference",
-    "criterion_name": "Single Chamber and Dual Chamber Permanent Cardiac Pacemakers — associated CMS Billing & Coding Article",
+    "criterion_name": "Single Chamber and Dual Chamber Permanent Cardiac Pacemakers \u2014 associated CMS Billing & Coding Article",
     "text": "See MAC-specific pacemaker billing/coding article (varies by contractor since coding tables were moved out of the NCD).",
     "documentation_requirements": [],
     "exclusions": [],
@@ -98,7 +98,7 @@
     },
     "policy_status": "active",
     "effective_date": "2013-08-13",
-    "revision_date": "Not fixed — CMS revises NCDs on an as-needed basis (last change reflected in version 2)",
+    "revision_date": "Not fixed \u2014 CMS revises NCDs on an as-needed basis (last change reflected in version 2)",
     "chunk_type": "coding_reference"
   },
   {
@@ -130,7 +130,7 @@
     "section": "Coverage Criteria",
     "criterion_id": "C01",
     "criterion_type": "medical_necessity",
-    "criterion_name": "Implantable Cardioverter Defibrillators (ICDs) — medical necessity / coverage criteria",
+    "criterion_name": "Implantable Cardioverter Defibrillators (ICDs) \u2014 medical necessity / coverage criteria",
     "text": "Covers ICD implantation for (1) secondary prevention - patients with a personal history of sustained ventricular tachyarrhythmia (VT) or cardiac arrest due to ventricular fibrillation (VF); and (2) primary prevention - patients with prior MI and measured LVEF <=0.30-0.35, or non-ischemic dilated cardiomyopathy (NIDCM) >3 months with NYHA Class II/III heart failure and LVEF <=35% after >=3 months of optimal medical therapy. Patients must be clinically stable and not have NYHA Class IV heart failure (except for CRT indications), a disease with <1 year expected survival, or a recent CABG/PCI or MI within specified waiting periods (with limited exceptions). Shared decision-making is required before implant for primary-prevention patients.",
     "documentation_requirements": [],
     "exclusions": [],
@@ -144,7 +144,7 @@
     },
     "policy_status": "active",
     "effective_date": "2023-07-31",
-    "revision_date": "Not fixed — CMS revises NCDs on an as-needed basis (last change reflected in version 5)",
+    "revision_date": "Not fixed \u2014 CMS revises NCDs on an as-needed basis (last change reflected in version 5)",
     "chunk_type": "medical_necessity"
   },
   {
@@ -176,7 +176,7 @@
     "section": "Key Clinical Thresholds",
     "criterion_id": "C02",
     "criterion_type": "diagnostic_criteria",
-    "criterion_name": "Implantable Cardioverter Defibrillators (ICDs) — key clinical thresholds",
+    "criterion_name": "Implantable Cardioverter Defibrillators (ICDs) \u2014 key clinical thresholds",
     "text": "LVEF thresholds: <=0.30 (post-MI) / <=35% (NIDCM+NYHA II-III); LVEF measured by echo, nuclear imaging, cardiac MRI, or angiography; 3-month OMT requirement for NIDCM; NYHA Class IV generally excludes coverage (except CRT).",
     "documentation_requirements": [],
     "exclusions": [],
@@ -188,7 +188,7 @@
     },
     "policy_status": "active",
     "effective_date": "2023-07-31",
-    "revision_date": "Not fixed — CMS revises NCDs on an as-needed basis (last change reflected in version 5)",
+    "revision_date": "Not fixed \u2014 CMS revises NCDs on an as-needed basis (last change reflected in version 5)",
     "chunk_type": "clinical_thresholds"
   },
   {
@@ -220,7 +220,7 @@
     "section": "Coding Reference",
     "criterion_id": "C03",
     "criterion_type": "coding_reference",
-    "criterion_name": "Implantable Cardioverter Defibrillators (ICDs) — associated CMS Billing & Coding Article",
+    "criterion_name": "Implantable Cardioverter Defibrillators (ICDs) \u2014 associated CMS Billing & Coding Article",
     "text": "Article A56340 / A56343 - Billing and Coding: Implantable Automatic Defibrillators.",
     "documentation_requirements": [],
     "exclusions": [],
@@ -232,7 +232,7 @@
     },
     "policy_status": "active",
     "effective_date": "2023-07-31",
-    "revision_date": "Not fixed — CMS revises NCDs on an as-needed basis (last change reflected in version 5)",
+    "revision_date": "Not fixed \u2014 CMS revises NCDs on an as-needed basis (last change reflected in version 5)",
     "chunk_type": "coding_reference"
   },
   {
@@ -254,7 +254,7 @@
     "section": "Coverage Criteria",
     "criterion_id": "C01",
     "criterion_type": "medical_necessity",
-    "criterion_name": "Mammograms — medical necessity / coverage criteria",
+    "criterion_name": "Mammograms \u2014 medical necessity / coverage criteria",
     "text": "Screening mammography: covered annually for women age 40+, one baseline exam for ages 35-39, not covered under age 35; each screening exam requires >=11 months since the prior one. Diagnostic mammography: covered when ordered by a physician for a patient with signs/symptoms of breast disease, a personal history of breast cancer, or biopsy-proven benign breast disease.",
     "documentation_requirements": [
       "Physician order documentation"
@@ -270,7 +270,7 @@
     },
     "policy_status": "active",
     "effective_date": "1978-05-15",
-    "revision_date": "Not fixed — CMS revises NCDs on an as-needed basis (last change reflected in version 1)",
+    "revision_date": "Not fixed \u2014 CMS revises NCDs on an as-needed basis (last change reflected in version 1)",
     "chunk_type": "medical_necessity"
   },
   {
@@ -292,7 +292,7 @@
     "section": "Key Clinical Thresholds",
     "criterion_id": "C02",
     "criterion_type": "diagnostic_criteria",
-    "criterion_name": "Mammograms — key clinical thresholds",
+    "criterion_name": "Mammograms \u2014 key clinical thresholds",
     "text": "Screening age gate: 35 (baseline), 40+ (annual); frequency: 11-month minimum interval; primary screening-medical-necessity diagnosis code: encounter for screening mammogram for malignant neoplasm of breast.",
     "documentation_requirements": [],
     "exclusions": [],
@@ -304,7 +304,7 @@
     },
     "policy_status": "active",
     "effective_date": "1978-05-15",
-    "revision_date": "Not fixed — CMS revises NCDs on an as-needed basis (last change reflected in version 1)",
+    "revision_date": "Not fixed \u2014 CMS revises NCDs on an as-needed basis (last change reflected in version 1)",
     "chunk_type": "clinical_thresholds"
   },
   {
@@ -326,7 +326,7 @@
     "section": "Coding Reference",
     "criterion_id": "C03",
     "criterion_type": "coding_reference",
-    "criterion_name": "Mammograms — associated CMS Billing & Coding Article",
+    "criterion_name": "Mammograms \u2014 associated CMS Billing & Coding Article",
     "text": "Article A56448 - Billing and Coding: Breast Imaging Mammography/Breast Echography (Sonography)/Breast MRI/Ductography.",
     "documentation_requirements": [],
     "exclusions": [],
@@ -338,7 +338,7 @@
     },
     "policy_status": "active",
     "effective_date": "1978-05-15",
-    "revision_date": "Not fixed — CMS revises NCDs on an as-needed basis (last change reflected in version 1)",
+    "revision_date": "Not fixed \u2014 CMS revises NCDs on an as-needed basis (last change reflected in version 1)",
     "chunk_type": "coding_reference"
   },
   {
@@ -359,7 +359,7 @@
     "section": "Coverage Criteria",
     "criterion_id": "C01",
     "criterion_type": "medical_necessity",
-    "criterion_name": "Colorectal Cancer Screening Tests — medical necessity / coverage criteria",
+    "criterion_name": "Colorectal Cancer Screening Tests \u2014 medical necessity / coverage criteria",
     "text": "Covers several screening modalities for asymptomatic, average-risk beneficiaries: guaiac/immunoassay fecal occult blood test (FOBT) annually (age 45+); multi-target stool DNA test (e.g., Cologuard) once every 3 years (age 45-85, following a 2023 policy update lowering the minimum age); blood-based biomarker test once every 3 years (age 45+, since 01/19/2021). 'Average risk' excludes patients with personal history of adenomatous polyps, colorectal cancer, or inflammatory bowel disease, or family history of colorectal cancer/polyposis syndromes.",
     "documentation_requirements": [],
     "exclusions": [
@@ -373,7 +373,7 @@
     },
     "policy_status": "active",
     "effective_date": "2023-01-01",
-    "revision_date": "Not fixed — CMS revises NCDs on an as-needed basis (last change reflected in version 7)",
+    "revision_date": "Not fixed \u2014 CMS revises NCDs on an as-needed basis (last change reflected in version 7)",
     "chunk_type": "medical_necessity"
   },
   {
@@ -394,7 +394,7 @@
     "section": "Key Clinical Thresholds",
     "criterion_id": "C02",
     "criterion_type": "diagnostic_criteria",
-    "criterion_name": "Colorectal Cancer Screening Tests — key clinical thresholds",
+    "criterion_name": "Colorectal Cancer Screening Tests \u2014 key clinical thresholds",
     "text": "Age gates: 45+ (most tests, updated 2023); frequency: annual (FOBT) / every 3 years (stool DNA, blood-based); exclusions: symptomatic, personal/family high-risk history.",
     "documentation_requirements": [],
     "exclusions": [],
@@ -406,7 +406,7 @@
     },
     "policy_status": "active",
     "effective_date": "2023-01-01",
-    "revision_date": "Not fixed — CMS revises NCDs on an as-needed basis (last change reflected in version 7)",
+    "revision_date": "Not fixed \u2014 CMS revises NCDs on an as-needed basis (last change reflected in version 7)",
     "chunk_type": "clinical_thresholds"
   },
   {
@@ -427,7 +427,7 @@
     "section": "Coding Reference",
     "criterion_id": "C03",
     "criterion_type": "coding_reference",
-    "criterion_name": "Colorectal Cancer Screening Tests — associated CMS Billing & Coding Article",
+    "criterion_name": "Colorectal Cancer Screening Tests \u2014 associated CMS Billing & Coding Article",
     "text": "See CMS NCD 210.3 coding/transmittal spreadsheet (diagnosis code lists maintained outside the NCD text; updated periodically).",
     "documentation_requirements": [],
     "exclusions": [],
@@ -439,7 +439,7 @@
     },
     "policy_status": "active",
     "effective_date": "2023-01-01",
-    "revision_date": "Not fixed — CMS revises NCDs on an as-needed basis (last change reflected in version 7)",
+    "revision_date": "Not fixed \u2014 CMS revises NCDs on an as-needed basis (last change reflected in version 7)",
     "chunk_type": "coding_reference"
   },
   {
@@ -464,7 +464,7 @@
     "section": "Coverage Criteria",
     "criterion_id": "C01",
     "criterion_type": "medical_necessity",
-    "criterion_name": "Positron Emission Tomography (FDG) for Oncologic Conditions — medical necessity / coverage criteria",
+    "criterion_name": "Positron Emission Tomography (FDG) for Oncologic Conditions \u2014 medical necessity / coverage criteria",
     "text": "Covers FDG PET for biopsy-proven or strongly-suspected solid tumors/myeloma to guide the initial anti-tumor treatment strategy (staging, determining candidacy for an invasive procedure, or locating the optimal biopsy site) - contractor discretion applies to any scan beyond the first. Also covers up to three FDG PET scans to guide subsequent management after completion of initial anti-cancer therapy for the same diagnosis; additional scans beyond three are left to local MAC discretion. Coverage does not extend to routine cancer screening in asymptomatic patients.",
     "documentation_requirements": [],
     "exclusions": [],
@@ -476,7 +476,7 @@
     },
     "policy_status": "active",
     "effective_date": "2013-06-11",
-    "revision_date": "Not fixed — CMS revises NCDs on an as-needed basis (last change reflected in version 4)",
+    "revision_date": "Not fixed \u2014 CMS revises NCDs on an as-needed basis (last change reflected in version 4)",
     "chunk_type": "medical_necessity"
   },
   {
@@ -501,7 +501,7 @@
     "section": "Key Clinical Thresholds",
     "criterion_id": "C02",
     "criterion_type": "diagnostic_criteria",
-    "criterion_name": "Positron Emission Tomography (FDG) for Oncologic Conditions — key clinical thresholds",
+    "criterion_name": "Positron Emission Tomography (FDG) for Oncologic Conditions \u2014 key clinical thresholds",
     "text": "Frequency: local-MAC discretion for extra initial-strategy scans; up to 3 covered scans for subsequent/post-treatment monitoring per cancer diagnosis; cancer must be biopsy-proven or strongly suspected (not screening use).",
     "documentation_requirements": [],
     "exclusions": [],
@@ -513,7 +513,7 @@
     },
     "policy_status": "active",
     "effective_date": "2013-06-11",
-    "revision_date": "Not fixed — CMS revises NCDs on an as-needed basis (last change reflected in version 4)",
+    "revision_date": "Not fixed \u2014 CMS revises NCDs on an as-needed basis (last change reflected in version 4)",
     "chunk_type": "clinical_thresholds"
   },
   {
@@ -538,7 +538,7 @@
     "section": "Coding Reference",
     "criterion_id": "C03",
     "criterion_type": "coding_reference",
-    "criterion_name": "Positron Emission Tomography (FDG) for Oncologic Conditions — associated CMS Billing & Coding Article",
+    "criterion_name": "Positron Emission Tomography (FDG) for Oncologic Conditions \u2014 associated CMS Billing & Coding Article",
     "text": "See CMS NCD coding/transmittal material; coding tables maintained separately from the NCD text.",
     "documentation_requirements": [],
     "exclusions": [],
@@ -550,7 +550,7 @@
     },
     "policy_status": "active",
     "effective_date": "2013-06-11",
-    "revision_date": "Not fixed — CMS revises NCDs on an as-needed basis (last change reflected in version 4)",
+    "revision_date": "Not fixed \u2014 CMS revises NCDs on an as-needed basis (last change reflected in version 4)",
     "chunk_type": "coding_reference"
   },
   {
@@ -571,7 +571,7 @@
     "section": "Coverage Criteria",
     "criterion_id": "C01",
     "criterion_type": "medical_necessity",
-    "criterion_name": "Total Knee Arthroplasty — medical necessity / coverage criteria",
+    "criterion_name": "Total Knee Arthroplasty \u2014 medical necessity / coverage criteria",
     "text": "Medically necessary when the patient has advanced joint disease shown on radiography (or MRI/CT if radiography is inadequate) - e.g., subchondral cysts/sclerosis, periarticular osteophytes, joint-space narrowing, avascular necrosis - combined with pain or functional disability from trauma or arthritis, and, where appropriate, a documented history of unsuccessful conservative (non-surgical) therapy or documented justification for skipping it. Revision/replacement is separately indicated for component loosening, fracture/mechanical failure, infection, periprosthetic fracture, progressive bone loss, symptomatic wear, malalignment, stiffness/arthrofibrosis, or instability. Not medically necessary in the presence of active joint/systemic infection, active urinary/dental/skin infection or open wound at the surgical site, or rapidly progressive neurological disease.",
     "documentation_requirements": [
       "Imaging documentation",
@@ -588,8 +588,8 @@
       "section": "Local medical-necessity coverage for total knee arthroplasty; associated coding/documentation material is maintained in the companion Article."
     },
     "policy_status": "active",
-    "effective_date": "Local — J-E and J-F",
-    "revision_date": "Not fixed — CMS revises LCDs on an as-needed basis (last change reflected in version Revision 11/06/2025)",
+    "effective_date": "Local \u2014 J-E and J-F",
+    "revision_date": "Not fixed \u2014 CMS revises LCDs on an as-needed basis (last change reflected in version Revision 11/06/2025)",
     "chunk_type": "medical_necessity"
   },
   {
@@ -610,7 +610,7 @@
     "section": "Key Clinical Thresholds",
     "criterion_id": "C02",
     "criterion_type": "diagnostic_criteria",
-    "criterion_name": "Total Knee Arthroplasty — key clinical thresholds",
+    "criterion_name": "Total Knee Arthroplasty \u2014 key clinical thresholds",
     "text": "Requires: imaging evidence + pain/functional disability + (conservative therapy history OR documented rationale to skip it). Hard contraindications: active infection (joint, systemic, urinary, dental, skin), open wound at site, rapidly progressive neurologic disease.",
     "documentation_requirements": [
       "Imaging documentation"
@@ -625,8 +625,8 @@
       "section": "Local medical-necessity coverage for total knee arthroplasty; associated coding/documentation material is maintained in the companion Article."
     },
     "policy_status": "active",
-    "effective_date": "Local — J-E and J-F",
-    "revision_date": "Not fixed — CMS revises LCDs on an as-needed basis (last change reflected in version Revision 11/06/2025)",
+    "effective_date": "Local \u2014 J-E and J-F",
+    "revision_date": "Not fixed \u2014 CMS revises LCDs on an as-needed basis (last change reflected in version Revision 11/06/2025)",
     "chunk_type": "clinical_thresholds"
   },
   {
@@ -647,7 +647,7 @@
     "section": "Coding Reference",
     "criterion_id": "C03",
     "criterion_type": "coding_reference",
-    "criterion_name": "Total Knee Arthroplasty — associated CMS Billing & Coding Article",
+    "criterion_name": "Total Knee Arthroplasty \u2014 associated CMS Billing & Coding Article",
     "text": "Article A57685 - Billing and Coding: Total Knee Arthroplasty.",
     "documentation_requirements": [],
     "exclusions": [],
@@ -658,8 +658,8 @@
       "section": "Billing and Coding Article"
     },
     "policy_status": "active",
-    "effective_date": "Local — J-E and J-F",
-    "revision_date": "Not fixed — CMS revises LCDs on an as-needed basis (last change reflected in version Revision 11/06/2025)",
+    "effective_date": "Local \u2014 J-E and J-F",
+    "revision_date": "Not fixed \u2014 CMS revises LCDs on an as-needed basis (last change reflected in version Revision 11/06/2025)",
     "chunk_type": "coding_reference"
   },
   {
@@ -685,7 +685,7 @@
     "section": "Coverage Criteria",
     "criterion_id": "C01",
     "criterion_type": "medical_necessity",
-    "criterion_name": "Total Joint Arthroplasty — medical necessity / coverage criteria",
+    "criterion_name": "Total Joint Arthroplasty \u2014 medical necessity / coverage criteria",
     "text": "Covers total hip and knee replacement (not unicompartmental knee replacement) under medical-necessity criteria closely aligned with other MAC total-joint LCDs: documented advanced joint disease with imaging support, pain/functional impairment, and conservative-therapy history or justification for bypassing it. Not reasonable and necessary where there is active hip/knee joint or systemic infection, active skin infection or open wound at the planned surgical site, or rapidly progressive neurological disease (except with a concomitant displaced femoral neck fracture).",
     "documentation_requirements": [],
     "exclusions": [
@@ -699,7 +699,7 @@
     },
     "policy_status": "active",
     "effective_date": "2026-04-01",
-    "revision_date": "Not fixed — CMS revises LCDs on an as-needed basis (last change reflected in version R5)",
+    "revision_date": "Not fixed \u2014 CMS revises LCDs on an as-needed basis (last change reflected in version R5)",
     "chunk_type": "medical_necessity"
   },
   {
@@ -725,7 +725,7 @@
     "section": "Key Clinical Thresholds",
     "criterion_id": "C02",
     "criterion_type": "diagnostic_criteria",
-    "criterion_name": "Total Joint Arthroplasty — key clinical thresholds",
+    "criterion_name": "Total Joint Arthroplasty \u2014 key clinical thresholds",
     "text": "Same structural criteria pattern as L36575 (imaging + pain/disability + conservative-therapy documentation); explicit exception allowing surgery with rapidly progressive neuro disease only if there's a concomitant displaced femoral neck fracture.",
     "documentation_requirements": [
       "Clinical documentation"
@@ -739,7 +739,7 @@
     },
     "policy_status": "active",
     "effective_date": "2026-04-01",
-    "revision_date": "Not fixed — CMS revises LCDs on an as-needed basis (last change reflected in version R5)",
+    "revision_date": "Not fixed \u2014 CMS revises LCDs on an as-needed basis (last change reflected in version R5)",
     "chunk_type": "clinical_thresholds"
   },
   {
@@ -765,7 +765,7 @@
     "section": "Coding Reference",
     "criterion_id": "C03",
     "criterion_type": "coding_reference",
-    "criterion_name": "Total Joint Arthroplasty — associated CMS Billing & Coding Article",
+    "criterion_name": "Total Joint Arthroplasty \u2014 associated CMS Billing & Coding Article",
     "text": "Article A57428 - Billing and Coding: Total Joint Arthroplasty.",
     "documentation_requirements": [],
     "exclusions": [],
@@ -777,7 +777,7 @@
     },
     "policy_status": "active",
     "effective_date": "2026-04-01",
-    "revision_date": "Not fixed — CMS revises LCDs on an as-needed basis (last change reflected in version R5)",
+    "revision_date": "Not fixed \u2014 CMS revises LCDs on an as-needed basis (last change reflected in version R5)",
     "chunk_type": "coding_reference"
   },
   {
@@ -803,7 +803,7 @@
     "section": "Coverage Criteria",
     "criterion_id": "C01",
     "criterion_type": "medical_necessity",
-    "criterion_name": "Breast Imaging Mammography/Breast Echography (Sonography)/Breast MRI/Ductography — medical necessity / coverage criteria",
+    "criterion_name": "Breast Imaging Mammography/Breast Echography (Sonography)/Breast MRI/Ductography \u2014 medical necessity / coverage criteria",
     "text": "Screening mammography covered annually for women 40+, plus one baseline exam ages 35-39 (mirrors NCD 220.4). Breast ultrasound/sonography and MRI are covered for specific diagnostic indications such as characterizing a mammographically-detected or palpable mass, assessing implant integrity, or evaluating suspicious calcifications, generally when mammography alone is inconclusive. Diagnostic tests must be ordered by the treating physician managing the specific problem (42 CFR 410.32); orders from a non-treating provider are not reasonable and necessary.",
     "documentation_requirements": [
       "Physician order documentation"
@@ -817,7 +817,7 @@
     },
     "policy_status": "active",
     "effective_date": "2025-12-04",
-    "revision_date": "Not fixed — CMS revises LCDs on an as-needed basis (last change reflected in version 38)",
+    "revision_date": "Not fixed \u2014 CMS revises LCDs on an as-needed basis (last change reflected in version 38)",
     "chunk_type": "medical_necessity"
   },
   {
@@ -843,7 +843,7 @@
     "section": "Key Clinical Thresholds",
     "criterion_id": "C02",
     "criterion_type": "diagnostic_criteria",
-    "criterion_name": "Breast Imaging Mammography/Breast Echography (Sonography)/Breast MRI/Ductography — key clinical thresholds",
+    "criterion_name": "Breast Imaging Mammography/Breast Echography (Sonography)/Breast MRI/Ductography \u2014 key clinical thresholds",
     "text": "Screening age gates match NCD 220.4; ultrasound/MRI require a specific diagnostic indication (not general screening) and an order from the treating physician for that problem.",
     "documentation_requirements": [
       "Physician order documentation"
@@ -857,7 +857,7 @@
     },
     "policy_status": "active",
     "effective_date": "2025-12-04",
-    "revision_date": "Not fixed — CMS revises LCDs on an as-needed basis (last change reflected in version 38)",
+    "revision_date": "Not fixed \u2014 CMS revises LCDs on an as-needed basis (last change reflected in version 38)",
     "chunk_type": "clinical_thresholds"
   },
   {
@@ -883,7 +883,7 @@
     "section": "Coding Reference",
     "criterion_id": "C03",
     "criterion_type": "coding_reference",
-    "criterion_name": "Breast Imaging Mammography/Breast Echography (Sonography)/Breast MRI/Ductography — associated CMS Billing & Coding Article",
+    "criterion_name": "Breast Imaging Mammography/Breast Echography (Sonography)/Breast MRI/Ductography \u2014 associated CMS Billing & Coding Article",
     "text": "Article A56448 - Billing and Coding: Breast Imaging Mammography/Breast Echography (Sonography)/Breast MRI/Ductography.",
     "documentation_requirements": [],
     "exclusions": [],
@@ -895,7 +895,7 @@
     },
     "policy_status": "active",
     "effective_date": "2025-12-04",
-    "revision_date": "Not fixed — CMS revises LCDs on an as-needed basis (last change reflected in version 38)",
+    "revision_date": "Not fixed \u2014 CMS revises LCDs on an as-needed basis (last change reflected in version 38)",
     "chunk_type": "coding_reference"
   },
   {
@@ -1369,39 +1369,6 @@
     "limitations": [
       "ing pain and disability from osteoarthritis, RA, avascular necrosis, or post-traumatic arthritis, plus limited ROM/crepitus/effusion on exam, plus radiographic Kellgren-Lawrence grade 3-4 osteoarthritis (or avascular necrosis or RA-related joint-space narrowing), AND a documented 12-week (or 24-week if BMI>40 or age<50) trial of conservative therapy including anti-inflammatories, exercise, activity modification, and in-person supervised physical therapy"
     ],
-    "contraindications": [],
-    "source_reference": {
-      "url": "https://www.aetna.com/cpb/medical/data/600_699/0660.html",
-      "section": "Policy - Medical Necessity"
-    },
-    "policy_status": "active",
-    "effective_date": "2026-02-26",
-    "revision_date": "2026-07-23",
-    "chunk_type": "medical_necessity"
-  },
-  {
-    "chunk_id": "AETNA-0660-C02",
-    "policy_id": "CPB-0660",
-    "payer": "Aetna",
-    "policy_title": "Knee Arthroplasty",
-    "clinical_domain": "orthopedics",
-    "procedure_codes": [
-      "27447",
-      "27446"
-    ],
-    "diagnosis_codes": [
-      "M17.11"
-    ],
-    "section": "Policy - Medical Necessity",
-    "criterion_id": "C02",
-    "criterion_type": "medical_necessity",
-    "criterion_name": "Documented conservative therapy trial",
-    "text": "A documented trial of conservative therapy must be completed prior to total knee arthroplasty: 12 weeks (or 24 weeks if BMI greater than 40 or age less than 50) of conservative management including anti-inflammatory medication, therapeutic exercise, activity modification, and in-person supervised physical therapy.",
-    "documentation_requirements": [
-      "Conservative therapy records documenting duration and modalities"
-    ],
-    "exclusions": [],
-    "limitations": [],
     "contraindications": [],
     "source_reference": {
       "url": "https://www.aetna.com/cpb/medical/data/600_699/0660.html",

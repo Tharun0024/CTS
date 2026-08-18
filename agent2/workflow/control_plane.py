@@ -146,6 +146,28 @@ class ProviderDecisionRecord:
     decided_at: str = field(default_factory=_utc_now_iso)
 
 
+@dataclass(frozen=True)
+class PriorAuthPrecheckRecord:
+    """Phase 1: deterministic prior-auth pre-check outcome for one claim run.
+
+    Recorded on the control plane BEFORE Agent 1 evaluation. It never alters
+    the frozen lifecycle states/transitions: it is an explicit, immutable,
+    explainable representation of whether the claim/procedure requires prior
+    authorization (requires_prior_auth, matched_rule, reason,
+    policy_reference, source).
+    """
+
+    precheck_id: str
+    claim_id: str
+    claim_version: int
+    requires_prior_auth: bool
+    matched_rule: str
+    reason: str
+    policy_reference: Optional[str] = None
+    source: Optional[str] = None
+    recorded_at: str = field(default_factory=_utc_now_iso)
+
+
 class WorkflowControlPlane:
     """Enforces legal state transitions and records immutable audit events.
 
@@ -164,6 +186,7 @@ class WorkflowControlPlane:
         self._versions: Dict[str, int] = {}
         self._events: List[WorkflowEvent] = []      # append-only
         self._provider_decisions: List[ProviderDecisionRecord] = []  # append-only
+        self._prior_auth_prechecks: List[PriorAuthPrecheckRecord] = []  # append-only
 
     # -- state access ------------------------------------------------------
 
@@ -264,6 +287,52 @@ class WorkflowControlPlane:
             correlation_id=correlation_id,
             detail=resolution_note or None,
         )
+
+    # -- Phase 1 prior-auth pre-check ----------------------------------------
+
+    def record_prior_auth_precheck(
+        self,
+        claim_id: str,
+        precheck: Any,
+        claim_version: Optional[int] = None,
+    ) -> PriorAuthPrecheckRecord:
+        """Record the deterministic prior-auth pre-check outcome (Phase 1).
+
+        Legal ONLY while the claim is in RECEIVED, i.e. before Agent 1
+        evaluation starts (including after HUMAN_REVIEW resolution re-entry,
+        which returns the claim to RECEIVED). The record is explicit and
+        immutable but introduces NO new lifecycle state and NO new
+        transition, so the frozen state machine and the exact event trail are
+        preserved unchanged.
+        """
+        state = self.current_state(claim_id)
+        if state != ClaimWorkflowState.RECEIVED:
+            raise IllegalWorkflowTransition(
+                f"Illegal prior-auth pre-check recording for claim '{claim_id}': "
+                f"current state is {state.value}; the pre-check may only be "
+                "recorded in RECEIVED, before Agent 1 evaluation."
+            )
+        if claim_version is None:
+            claim_version = self._versions.get(claim_id, 1)
+        record = PriorAuthPrecheckRecord(
+            precheck_id=f"PAPC-{uuid.uuid4().hex[:10].upper()}",
+            claim_id=claim_id,
+            claim_version=claim_version,
+            requires_prior_auth=bool(getattr(precheck, "requires_prior_auth", False)),
+            matched_rule=str(getattr(precheck, "matched_rule", "") or ""),
+            reason=str(getattr(precheck, "reason", "") or ""),
+            policy_reference=getattr(precheck, "policy_reference", None),
+            source=getattr(precheck, "source", None),
+        )
+        self._prior_auth_prechecks.append(record)
+        return record
+
+    def prior_auth_precheck(self, claim_id: str) -> Optional[PriorAuthPrecheckRecord]:
+        """Latest recorded prior-auth pre-check for the claim (None if none)."""
+        for record in reversed(self._prior_auth_prechecks):
+            if record.claim_id == claim_id:
+                return record
+        return None
 
     # -- provider consent ----------------------------------------------------
 

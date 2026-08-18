@@ -59,3 +59,6 @@ class HumanResolutionRequest(BaseModel):
 
     resolution_note: str = ""
     attached_evidence: List[Dict[str, Any]] = Field(default_factory=list)
+    # Phase 3: only the hospital portal may resolve a human review; any other
+    # portal (e.g. "insurance") is read-only for this state and gets a 403.
+    resolved_by: str = "hospital"

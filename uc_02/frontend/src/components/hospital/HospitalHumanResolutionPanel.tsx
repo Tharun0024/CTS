@@ -52,14 +52,18 @@ export function HospitalHumanResolutionPanel({ claim, onResolved }: HospitalHuma
         <div className="flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 text-rose-600" />
           <h3 className="text-[12px] font-extrabold text-rose-900 uppercase tracking-wider">
-            Hospital Review Resolution
+            {claim.human_verification_pending
+              ? 'Human Verification Required — Hospital Resolution'
+              : 'Hospital Review Resolution'}
           </h3>
         </div>
       </div>
 
       <div className="p-5 space-y-4">
         <p className="text-[12px] text-slate-600 font-semibold leading-relaxed">
-          Provide a clinical justification or document reference to resolve this review hold and re-enter normal evaluation.
+          {claim.human_verification_pending
+            ? 'Agent 1 rejected this claim. Verify the rejection against the clinical evidence, then approve or reject — this is the only authoritative resolution; the insurance portal is read-only.'
+            : 'Provide a clinical justification or document reference to resolve this review hold and re-enter normal evaluation.'}
         </p>
 
         <div>

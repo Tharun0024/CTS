@@ -206,16 +206,20 @@ class TestCreateAndRetrieve:
         assert len(body["versions"]) == 1
         assert body["submissions"] == []
 
-    def test_hard_reject_is_terminal_without_agent2(self, api_registry):
+    def test_hard_reject_holds_for_human_verification_without_agent2(self, api_registry):
         chunks = [_chunk("POL-API-EX", "C01", "Diagnosis documentation required.")]
         client, _ = _make_client(chunks, pool=_ldl_pool(), exclusions=AGE_EXCLUSIONS)
         claim = _scenario_claim("CLM-API-REJ", "POL-API-EX", age=85)
 
         body = client.post("/api/claims", json={"canonical_claim": claim}).json()
-        assert body["status"] == "REJECTED"
-        assert body["workflow_state"] == "REJECTED"
+        # Phase 3: REJECT is held for human cross-verification, never
+        # immediately REJECTED; the original rejection stays visible.
+        assert body["status"] == "HUMAN_REVIEW"
+        assert body["workflow_state"] == "HUMAN_REVIEW"
+        assert body["human_verification_pending"] is True
         assert body["decision"]["outcome"] == "REJECT"
         assert body["decision"]["status"] == "REJECT"
+        assert body["original_rejection"]["outcome"] == "REJECT"
         assert body["agent2_invoked"] is False               # frozen: REJECT never recovers
         assert body["evidence_request"] is None
         assert len(body["versions"]) == 1
