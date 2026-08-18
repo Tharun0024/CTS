@@ -227,7 +227,7 @@ class RuntimeAdapter:
         evidence_rows = self._fetch_all(
             self.provider_db,
             "SELECT evidence_id, patient_id, source_type, source_record_id, document_id, evidence_type, event_date, content_reference, provenance, sensitivity FROM evidence WHERE patient_id = ? AND evidence_id IN ({}) ORDER BY evidence_id".format(", ".join("?" for _ in evidence_ids)),
-            (patient_id, *evidence_ids),
+            (real_patient_id, *evidence_ids),
         ) if evidence_ids else []
 
         evidence_list: List[Dict[str, Any]] = []
@@ -287,10 +287,15 @@ class RuntimeAdapter:
                         if key not in clinical_metrics:
                             clinical_metrics[key] = value
 
-        claim_id_ret = claim_id_orig if claim_id_orig else (f"CLM-{patient_id_orig}" if patient_id_orig.startswith("SIM-") else claim_id)
+        is_simulation = patient_id_orig and "-SIM-" in patient_id_orig
+        if is_simulation:
+            claim_id_ret = claim_id_orig if claim_id_orig else f"CLM-{patient_id_orig}"
+        else:
+            claim_id_ret = claim_id_orig if claim_id_orig else claim_id
 
         return {
             "claim_id": claim_id_ret,
+            "patient_id": patient_id_orig,
             "submission": {
                 "attempt": selected_attempt,
                 "date": submission_row["timestamp"],

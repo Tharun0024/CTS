@@ -721,7 +721,7 @@ def run_agent2_v1_pipeline(
                         )
                         final_outcome_override = DecisionOutcome.APPROVE
                         decision.outcome = DecisionOutcome.APPROVE
-                        decision.reason = note
+                        decision.reasoning.append(note)
                         if hasattr(DecisionReasonCode, 'HUMAN_DECISION'):
                             decision.reason_code = DecisionReasonCode.HUMAN_DECISION
                         break
@@ -733,7 +733,7 @@ def run_agent2_v1_pipeline(
                         )
                         final_outcome_override = DecisionOutcome.REJECT
                         decision.outcome = DecisionOutcome.REJECT
-                        decision.reason = note
+                        decision.reasoning.append(note)
                         if hasattr(DecisionReasonCode, 'HUMAN_DECISION'):
                             decision.reason_code = DecisionReasonCode.HUMAN_DECISION
                         break

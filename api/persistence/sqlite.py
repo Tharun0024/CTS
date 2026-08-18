@@ -116,6 +116,9 @@ class SqliteClaimRecordRepository(ClaimRecordRepository, _SqliteStoreBase):
             conn.execute(
                 "DELETE FROM agent2_audit WHERE claim_id = ?;", (claim_id,)
             )
+            conn.execute(
+                "DELETE FROM provider_decisions WHERE claim_id = ?;", (claim_id,)
+            )
             conn.commit()
             return cursor.rowcount > 0
         finally:

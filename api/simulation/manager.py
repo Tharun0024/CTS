@@ -539,6 +539,7 @@ class SimulationManager:
 
             import itertools
             for index in (range(limit) if limit is not None else itertools.count()):
+                iter_start = time.time()
                 if runtime.stop_requested:
                     break
                 with self._lock:
@@ -633,15 +634,25 @@ class SimulationManager:
                 # Duration-based pacing: the measured end-to-end duration of
                 # this patient paces the generation/processing of the next one.
                 if (limit is None or index < limit - 1) and not runtime.stop_requested:
-                    pace = duration * self.pace_multiplier
-                    if self.max_pace_seconds is not None:
-                        pace = min(pace, self.max_pace_seconds)
-                    pace = max(pace, pause_seconds or 0.0)
+                    if limit is None:
+                        elapsed = time.time() - iter_start
+                        pace = max(0.0, 20.0 - elapsed)
+                    else:
+                        pace = duration * self.pace_multiplier
+                        if self.max_pace_seconds is not None:
+                            pace = min(pace, self.max_pace_seconds)
+                        pace = max(pace, pause_seconds or 0.0)
                     with self._lock:
                         record = self._require_record(simulation_id)
                         record["timing"]["last_pace_seconds"] = round(pace, 6)
                         self.simulation_store.save(record)
-                    self._sleep(pace)
+                    # Interruptible sleep in 0.1s steps to react quickly to stop requests.
+                    slept = 0.0
+                    step = 0.1
+                    while slept < pace and not runtime.stop_requested:
+                        to_sleep = min(step, pace - slept)
+                        self._sleep(to_sleep)
+                        slept += to_sleep
 
             with self._lock:
                 record = self._require_record(simulation_id)

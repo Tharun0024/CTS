@@ -122,6 +122,10 @@ class ClaimService:
         summaries = []
         for record in self.claim_store.list():
             decision = record.get("decision") or {}
+            canonical = record.get("canonical_claim") or {}
+            case_data = canonical.get("case_data") or {}
+            metrics = case_data.get("clinical_metrics") or {}
+            procedures = case_data.get("procedures") or []
             summaries.append({
                 "claim_id": record.get("claim_id"),
                 "patient_id": record.get("patient_id"),
@@ -133,6 +137,14 @@ class ClaimService:
                 "agent2_invoked": record.get("agent2_invoked"),
                 "resubmissions": record.get("resubmissions"),
                 "updated_at": record.get("updated_at"),
+                "procedure": metrics.get("claim_procedure") or (
+                    procedures[0] if procedures else None
+                ),
+                "procedure_code": procedures[0] if procedures else None,
+                "diagnosis_codes": list(case_data.get("diagnoses") or []),
+                "service_date": (canonical.get("submission") or {}).get("date"),
+                "payer": metrics.get("claim_payer"),
+                "policy_id": metrics.get("claim_policy_id"),
             })
         return summaries
 

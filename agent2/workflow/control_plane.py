@@ -169,10 +169,28 @@ class WorkflowControlPlane:
 
     def current_state(self, claim_id: str) -> ClaimWorkflowState:
         """Current lifecycle state; a never-seen claim starts in INIT."""
-        return self._states.get(claim_id, ClaimWorkflowState.INIT)
+        if claim_id in self._states:
+            return self._states[claim_id]
+        if self._persist_db:
+            from ..database.repositories.audit_repository import AuditRepository
+            trail = AuditRepository().get_audit_trail(claim_id)
+            if trail:
+                state_str = trail[-1]["state_after"]
+                try:
+                    return ClaimWorkflowState(state_str)
+                except ValueError:
+                    return ClaimWorkflowState.INIT
+        return ClaimWorkflowState.INIT
 
     def current_version(self, claim_id: str) -> int:
-        return self._versions.get(claim_id, 1)
+        if claim_id in self._versions:
+            return self._versions[claim_id]
+        if self._persist_db:
+            from ..database.repositories.audit_repository import AuditRepository
+            trail = AuditRepository().get_audit_trail(claim_id)
+            if trail:
+                return trail[-1]["claim_version"] or 1
+        return 1
 
     # -- transitions -------------------------------------------------------
 
@@ -286,6 +304,45 @@ class WorkflowControlPlane:
         """Append-only audit trail (tuple copy: callers can never mutate it)."""
         if claim_id is None:
             return tuple(self._events)
+            
+        if self._persist_db:
+            from ..database.repositories.audit_repository import AuditRepository
+            trail = AuditRepository().get_audit_trail(claim_id)
+            events_list = []
+            for i, row in enumerate(trail):
+                action_str = row["action"] or ""
+                erq_id = None
+                detail = None
+                
+                if " [erq=" in action_str:
+                    try:
+                        erq_part = action_str.split(" [erq=")[1].split("]")[0]
+                        erq_id = erq_part
+                    except Exception:
+                        pass
+                
+                if " | " in action_str:
+                    try:
+                        detail = action_str.split(" | ")[1]
+                    except Exception:
+                        pass
+                        
+                events_list.append(
+                    WorkflowEvent(
+                        seq=i + 1,
+                        claim_id=row["claim_id"],
+                        claim_version=row["claim_version"],
+                        state_before=row["state_before"],
+                        state_after=row["state_after"],
+                        action=row["action"],
+                        correlation_id=row["correlation_id"] or None,
+                        evidence_request_id=erq_id,
+                        detail=detail,
+                        timestamp=row["timestamp"],
+                    )
+                )
+            return tuple(events_list)
+            
         return tuple(e for e in self._events if e.claim_id == claim_id)
 
     def provider_decisions(
@@ -293,6 +350,34 @@ class WorkflowControlPlane:
     ) -> Tuple[ProviderDecisionRecord, ...]:
         if claim_id is None:
             return tuple(self._provider_decisions)
+            
+        if self._persist_db:
+            import json
+            from ..database.repositories.workflow_repository import WorkflowRepository
+            rows = WorkflowRepository().get_provider_decisions(claim_id)
+            decisions_list = []
+            for row in rows:
+                ev_ids = []
+                if row.get("evidence_ids"):
+                    try:
+                        ev_ids = json.loads(row["evidence_ids"])
+                    except Exception:
+                        pass
+                decisions_list.append(
+                    ProviderDecisionRecord(
+                        decision_id=row["decision_id"],
+                        claim_id=row["claim_id"],
+                        claim_version=row["claim_version"],
+                        decision=row["decision"],
+                        evidence_ids=tuple(ev_ids),
+                        evidence_request_id=row.get("evidence_request_id"),
+                        correlation_id=row.get("correlation_id"),
+                        reason=row.get("reason"),
+                        decided_at=row["decided_at"],
+                    )
+                )
+            return tuple(decisions_list)
+            
         return tuple(r for r in self._provider_decisions if r.claim_id == claim_id)
 
     # -- persistence ---------------------------------------------------------

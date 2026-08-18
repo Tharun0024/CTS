@@ -75,6 +75,7 @@ CLAIM_SERVICE = ClaimService(
     claim_store=_REPOSITORIES.get("claim_store"),
     provider_decision_store=_REPOSITORIES.get("provider_decision_store"),
     event_store=_REPOSITORIES.get("event_store"),
+    persist_workflow_db=True,
 )
 SIMULATION_MANAGER = SimulationManager(
     simulation_store=_REPOSITORIES.get("simulation_store"),

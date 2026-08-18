@@ -62,29 +62,56 @@ class DefaultPatientFactory:
         patient_id = f"PAT-{simulation_id}-{seq:04d}"
         claim_id = f"CLM-{patient_id}"
         
-        # 2. Sourcing real claim and patient details from the database
+        # 2. Resolve RAG policy ID, CPT and payer mapping
+        target_policy = self.policy_id or "CPB-0660"
+        
+        if "CPB-0660" in target_policy:
+            target_payer = "Aetna"
+            target_cpt = "27447"
+        elif "LCD-L36575" in target_policy or "LCD-L36039" in target_policy:
+            target_payer = "CMS"
+            target_cpt = "27447"
+        elif "CPB-0287" in target_policy:
+            target_payer = "Aetna"
+            target_cpt = "27130"
+        elif "CPB-0752" in target_policy:
+            target_payer = "Aetna"
+            target_cpt = "94660"
+        elif "CPB-0105" in target_policy:
+            target_payer = "Aetna"
+            target_cpt = "77048"
+        else:
+            target_payer = "Aetna"
+            target_cpt = "27447"
+
+        # 3. Sourcing real claim and patient details from the database
         from adapters.runtime_adapter import RuntimeAdapter
         adapter = RuntimeAdapter()
         claims_rows = adapter._fetch_all(
             adapter.provider_db,
-            "SELECT claim_id, patient_id, scenario_type FROM claims ORDER BY claim_id"
+            "SELECT claim_id, patient_id, scenario_type, procedure_code FROM claims ORDER BY claim_id"
         )
         
-        complete_claims = [r for r in claims_rows if r["scenario_type"] == "COMPLETE"]
-        omitted_claims = [r for r in claims_rows if r["scenario_type"] == "EVIDENCE_OMITTED"]
+        complete_claims = [r for r in claims_rows if r["scenario_type"] == "COMPLETE" and r["procedure_code"] == target_cpt]
+        omitted_claims = [r for r in claims_rows if r["scenario_type"] == "EVIDENCE_OMITTED" and r["procedure_code"] == target_cpt]
         
+        # Fallbacks if target CPT does not have direct complete/omitted rows
+        if not complete_claims:
+            complete_claims = [r for r in claims_rows if r["scenario_type"] == "COMPLETE"]
+        if not omitted_claims:
+            omitted_claims = [r for r in claims_rows if r["scenario_type"] == "EVIDENCE_OMITTED"]
+            
         if scenario == "COMPLETE" and complete_claims:
             row = complete_claims[(seq - 1) % len(complete_claims)]
         elif scenario == "MISSING_EVIDENCE" and omitted_claims:
             row = omitted_claims[(seq - 1) % len(omitted_claims)]
         else:
-            # Fallback/NOT_SATISFIED or missing lists: pick any other complete claim
             row = complete_claims[(seq - 1) % len(complete_claims)] if complete_claims else claims_rows[(seq - 1) % len(claims_rows)]
             
         real_claim_id = row["claim_id"]
         real_patient_id = row["patient_id"]
         
-        # 3. Retrieve authoritative persistent data using the unique simulated IDs
+        # 4. Retrieve authoritative persistent data using the unique simulated IDs
         canonical_claim = adapter.get_provider_canonical_claim(patient_id, claim_id)
         provider_pool = adapter.get_provider_evidence_pool(patient_id)
         payer_context = adapter.get_payer_context(patient_id)
@@ -96,7 +123,28 @@ class DefaultPatientFactory:
         # Ensure scenario mapping on the claim record matches simulation scenario type
         metrics = canonical_claim["case_data"]["clinical_metrics"]
         metrics["claim_scenario_type"] = scenario
+        metrics["claim_policy_id"] = target_policy
+        metrics["claim_payer"] = target_payer
         
+        # Override procedures to ensure matching compatible codes
+        canonical_claim["case_data"]["procedures"] = [target_cpt]
+        
+        # Scenario-specific overrides:
+        # For NOT_SATISFIED, we set patient_age to 16 to trigger deterministic age rule failure for C01
+        if scenario == "NOT_SATISFIED":
+            canonical_claim["case_data"]["patient_age"] = 16
+            metrics["patient_age"] = 16
+            
+        # Align payer context to match target policy payer
+        if payer_context:
+            payer_context["payer_id"] = target_payer
+            if target_payer == "Aetna":
+                payer_context["plan_id"] = "PLAN-AETNA-001"
+            else:
+                payer_context["plan_id"] = "PLAN-CMS-001"
+            payer_context.setdefault("eligibility", {})["is_eligible"] = True
+            payer_context.setdefault("coverage", {})["status"] = "ACTIVE"
+            
         case_data = canonical_claim["case_data"]
         age = case_data.get("patient_age") or 0
         gender = metrics.get("patient_gender") or "Unknown"
