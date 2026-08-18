@@ -80,9 +80,10 @@ class SimulatedProviderStore:
 class _SimRuntime:
     """Mutable execution context owned by one simulation run."""
 
-    def __init__(self, service: ClaimService, provider_store: SimulatedProviderStore):
+    def __init__(self, service: ClaimService, provider_store: SimulatedProviderStore, factory: Any):
         self.service = service
         self.provider_store = provider_store
+        self.factory = factory
         self.thread: Optional[threading.Thread] = None
         self.stop_requested = False
 
@@ -129,36 +130,37 @@ class SimulationManager:
                     f"Simulation {active} is already running; exactly one run at a time."
                 )
 
-            simulation_id = f"SIM-{uuid.uuid4().hex[:12].upper()}"
+            simulation_id = f"SIM-{uuid.uuid4().hex.upper()}"
             factory = self.patient_factory or DefaultPatientFactory(policy_id=request.policy_id)
             provider_store = SimulatedProviderStore()
             service = self._build_claim_service(provider_store)
 
             patients_meta: List[Dict[str, Any]] = []
             payer_contexts: Dict[str, Dict[str, Any]] = {}
-            for seq in range(1, request.count + 1):
-                descriptor = factory.make_patient(simulation_id, seq)
-                patient_id = descriptor["patient_id"]
-                if patient_id in self._issued_patient_ids:
-                    raise ValueError(f"Generated duplicate patient_id {patient_id}.")
-                self._issued_patient_ids.add(patient_id)
-                provider_store.add(patient_id, descriptor["canonical_claim"].get("evidence") or [])
-                provider_store.add(patient_id, descriptor.get("provider_evidence_pool") or [])
-                payer_contexts[patient_id] = descriptor["payer_context"]  # kept separate
-                patients_meta.append({
-                    "patient_id": patient_id,
-                    "claim_id": descriptor["claim_id"],
-                    "scenario": descriptor["scenario"],
-                    "status": "PENDING",
-                    "decision_outcome": None,
-                    "decision_status": None,
-                    "claim_status": None,
-                    "started_at": None,
-                    "completed_at": None,
-                    "duration_seconds": None,
-                    "documents": [],
-                    "_descriptor": descriptor,
-                })
+            if request.count is not None:
+                for seq in range(1, request.count + 1):
+                    descriptor = factory.make_patient(simulation_id, seq)
+                    patient_id = descriptor["patient_id"]
+                    if patient_id in self._issued_patient_ids:
+                        raise ValueError(f"Generated duplicate patient_id {patient_id}.")
+                    self._issued_patient_ids.add(patient_id)
+                    provider_store.add(patient_id, descriptor["canonical_claim"].get("evidence") or [])
+                    provider_store.add(patient_id, descriptor.get("provider_evidence_pool") or [])
+                    payer_contexts[patient_id] = descriptor["payer_context"]
+                    patients_meta.append({
+                        "patient_id": patient_id,
+                        "claim_id": descriptor["claim_id"],
+                        "scenario": descriptor["scenario"],
+                        "status": "PENDING",
+                        "decision_outcome": None,
+                        "decision_status": None,
+                        "claim_status": None,
+                        "started_at": None,
+                        "completed_at": None,
+                        "duration_seconds": None,
+                        "documents": [],
+                        "_descriptor": descriptor,
+                    })
 
             record = {
                 "simulation_id": simulation_id,
@@ -191,7 +193,7 @@ class SimulationManager:
                 "updated_at": _utc_now_iso(),
             }
             self.simulation_store.save(record)
-            runtime = _SimRuntime(service, provider_store)
+            runtime = _SimRuntime(service, provider_store, factory)
             self._runtimes[simulation_id] = runtime
             runtime.thread = threading.Thread(
                 target=self._run_simulation,
@@ -240,7 +242,6 @@ class SimulationManager:
                 deleted_counts["patients_deleted"] += res.get("patients_deleted", 0)
                 deleted_counts["claims_deleted"].extend(res.get("claims_deleted", []))
                 
-            self._issued_patient_ids.clear()
             return deleted_counts
 
     def delete(self, simulation_id: str) -> Dict[str, Any]:
@@ -257,14 +258,14 @@ class SimulationManager:
         with self._lock:
             record = self._require_record(simulation_id)
             runtime = self._runtimes.get(simulation_id)
+            service = runtime.service if runtime is not None else self._build_claim_service(SimulatedProviderStore())
             deleted_claims: List[str] = []
-            if runtime is not None:
-                for patient in record.get("patients") or []:
-                    claim_ids = [patient.get("claim_id")]
-                    claim_ids.extend(doc.get("claim_id") for doc in patient.get("documents") or [])
-                    for claim_id in claim_ids:
-                        if claim_id and runtime.service.claim_store.delete(claim_id):
-                            deleted_claims.append(claim_id)
+            for patient in record.get("patients") or []:
+                claim_ids = [patient.get("claim_id")]
+                claim_ids.extend(doc.get("claim_id") for doc in patient.get("documents") or [])
+                for claim_id in claim_ids:
+                    if claim_id and service.claim_store.delete(claim_id):
+                        deleted_claims.append(claim_id)
             self.simulation_store.delete(simulation_id)
             self._runtimes.pop(simulation_id, None)
             return {
@@ -331,19 +332,40 @@ class SimulationManager:
         """
         with self._lock:
             runtimes = [(sim_id, runtime) for sim_id, runtime in self._runtimes.items()]
+            sim_records = self.simulation_store.list()
+        
         if claim_id is not None:
+            # 1. Search active runtimes first
             for sim_id, runtime in runtimes:
                 record = runtime.service.claim_store.get(claim_id)
                 if record is not None:
                     enriched = runtime.service._with_live_views(record)
                     enriched["simulation_id"] = sim_id
                     return enriched
+            
+            # 2. Fallback: Search persisted simulations in SQLite simulation_store
+            for sim_record in sim_records:
+                sim_id = sim_record.get("simulation_id")
+                for patient in sim_record.get("patients") or []:
+                    if patient.get("claim_id") == claim_id:
+                        temp_service = self._build_claim_service(SimulatedProviderStore())
+                        record = temp_service.claim_store.get(claim_id)
+                        if record is not None:
+                            enriched = temp_service._with_live_views(record)
+                            enriched["simulation_id"] = sim_id
+                            return enriched
+                            
             raise SimulationNotFound(f"No simulation owns claim {claim_id}.")
 
         summaries: List[Dict[str, Any]] = []
+        active_claims = set()
+        
+        # 1. Process active runtimes
         for sim_id, runtime in runtimes:
             for summary in runtime.service.list_claims():
-                record = runtime.service.claim_store.get(summary["claim_id"]) or {}
+                cid = summary["claim_id"]
+                active_claims.add(cid)
+                record = runtime.service.claim_store.get(cid) or {}
                 canonical = record.get("canonical_claim") or {}
                 case_data = canonical.get("case_data") or {}
                 metrics = case_data.get("clinical_metrics") or {}
@@ -359,6 +381,34 @@ class SimulationManager:
                 summary["payer"] = metrics.get("claim_payer")
                 summary["policy_id"] = metrics.get("claim_policy_id")
                 summaries.append(summary)
+                
+        # 2. Fallback: Process persisted simulations for non-active ones
+        temp_service = self._build_claim_service(SimulatedProviderStore())
+        for sim_record in sim_records:
+            sim_id = sim_record.get("simulation_id")
+            if any(sim_id == active_sim[0] for active_sim in runtimes):
+                continue
+            for summary in temp_service.list_claims():
+                cid = summary["claim_id"]
+                belongs_to_sim = any(p.get("claim_id") == cid for p in sim_record.get("patients") or [])
+                if belongs_to_sim and cid not in active_claims:
+                    record = temp_service.claim_store.get(cid) or {}
+                    canonical = record.get("canonical_claim") or {}
+                    case_data = canonical.get("case_data") or {}
+                    metrics = case_data.get("clinical_metrics") or {}
+                    procedures = case_data.get("procedures") or []
+                    summary["simulation_id"] = sim_id
+                    summary["patient_id"] = record.get("patient_id") or summary.get("patient_id")
+                    summary["procedure"] = metrics.get("claim_procedure") or (
+                        procedures[0] if procedures else None
+                    )
+                    summary["procedure_code"] = procedures[0] if procedures else None
+                    summary["diagnosis_codes"] = list(case_data.get("diagnoses") or [])
+                    summary["service_date"] = (canonical.get("submission") or {}).get("date")
+                    summary["payer"] = metrics.get("claim_payer")
+                    summary["policy_id"] = metrics.get("claim_policy_id")
+                    summaries.append(summary)
+                    
         return summaries
 
     def status(self, simulation_id: Optional[str] = None) -> Dict[str, Any]:
@@ -484,20 +534,54 @@ class SimulationManager:
             with self._lock:
                 record = self._require_record(simulation_id)
                 runtime = self._runtimes[simulation_id]
-                total = record["total_count"]
+                limit = record["total_count"]
+                factory = runtime.factory
 
-            for index, _ in enumerate(range(total)):
+            import itertools
+            for index in (range(limit) if limit is not None else itertools.count()):
                 if runtime.stop_requested:
                     break
                 with self._lock:
                     record = self._require_record(simulation_id)
-                    patient = record["patients"][index]
-                    record["current_patient_id"] = patient["patient_id"]
-                    patient["status"] = "PROCESSING"
-                    patient["started_at"] = _utc_now_iso()
-                    record["updated_at"] = _utc_now_iso()
-                    self.simulation_store.save(record)
-                    descriptor = patient["_descriptor"]
+                    if index < len(record["patients"]):
+                        patient = record["patients"][index]
+                        patient_id = patient["patient_id"]
+                        descriptor = patient["_descriptor"]
+                        
+                        patient["status"] = "PROCESSING"
+                        patient["started_at"] = _utc_now_iso()
+                        record["current_patient_id"] = patient_id
+                        record["updated_at"] = _utc_now_iso()
+                        self.simulation_store.save(record)
+                    else:
+                        descriptor = factory.make_patient(simulation_id, index + 1)
+                        patient_id = descriptor["patient_id"]
+                        if patient_id in self._issued_patient_ids:
+                            raise ValueError(f"Generated duplicate patient_id {patient_id}.")
+                        self._issued_patient_ids.add(patient_id)
+                        runtime.provider_store.add(patient_id, descriptor["canonical_claim"].get("evidence") or [])
+                        runtime.provider_store.add(patient_id, descriptor.get("provider_evidence_pool") or [])
+                        
+                        record.setdefault("payer_contexts", {})[patient_id] = descriptor["payer_context"]
+                        
+                        patient = {
+                            "patient_id": patient_id,
+                            "claim_id": descriptor["claim_id"],
+                            "scenario": descriptor["scenario"],
+                            "status": "PROCESSING",
+                            "decision_outcome": None,
+                            "decision_status": None,
+                            "claim_status": None,
+                            "started_at": _utc_now_iso(),
+                            "completed_at": None,
+                            "duration_seconds": None,
+                            "documents": [],
+                            "_descriptor": descriptor,
+                        }
+                        record["patients"].append(patient)
+                        record["current_patient_id"] = patient_id
+                        record["updated_at"] = _utc_now_iso()
+                        self.simulation_store.save(record)
 
                 # THE real V1 pipeline (Phase 5A ClaimService) — no simulation
                 # shortcuts, no second pipeline.
@@ -548,7 +632,7 @@ class SimulationManager:
 
                 # Duration-based pacing: the measured end-to-end duration of
                 # this patient paces the generation/processing of the next one.
-                if index < total - 1 and not runtime.stop_requested:
+                if (limit is None or index < limit - 1) and not runtime.stop_requested:
                     pace = duration * self.pace_multiplier
                     if self.max_pace_seconds is not None:
                         pace = min(pace, self.max_pace_seconds)

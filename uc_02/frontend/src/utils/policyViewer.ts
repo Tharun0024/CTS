@@ -33,7 +33,7 @@ export function viewClaimPolicyContext(claim: ClaimDetails): void {
   }
 
   const diagnosisCodes = claim.claim.diagnosis_codes ?? [];
-  const criteriaEvaluated = [...new Set(claim.policy_evidence.map(item => item.criterion))];
+  const criteriaEvaluated = [...new Set(claim.policy_evidence.map(item => item.criterion))].filter((c): c is string => typeof c === 'string');
   const requested = [
     ...new Set([
       ...claim.missing_information,
@@ -44,9 +44,9 @@ export function viewClaimPolicyContext(claim: ClaimDetails): void {
   const evidenceRows = claim.policy_evidence.map(item => {
     const met = item.status === 'MET';
     return `<tr>
-      <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">${escapeHtml(item.criterion)}</td>
-      <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">${escapeHtml(item.patient_value)}</td>
-      <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">${escapeHtml(item.source)}</td>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">${escapeHtml(item.criterion || '')}</td>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">${escapeHtml(item.patient_value || '')}</td>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">${escapeHtml(item.source || '')}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: right;">
         <span style="font-size: 10px; font-weight: 800; padding: 3px 10px; border-radius: 9999px; text-transform: uppercase; border: 1px solid ${met ? '#a7f3d0' : '#fecaca'}; background: ${met ? '#ecfdf5' : '#fef2f2'}; color: ${met ? '#047857' : '#b91c1c'};">
           ${met ? 'Met' : 'Not Met'}

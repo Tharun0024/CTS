@@ -61,6 +61,16 @@ _REPOSITORIES = _build_repositories(_STORAGE_MODE)
 # Local document storage for raw uploads (cloud-swappable via DocumentStore).
 from api.persistence.document_store import LocalFileDocumentStore
 
+def make_sim_claim_service(components, recovery_source):
+    return ClaimService(
+        components=components,
+        recovery_source=recovery_source,
+        claim_store=_REPOSITORIES.get("claim_store"),
+        provider_decision_store=_REPOSITORIES.get("provider_decision_store"),
+        event_store=_REPOSITORIES.get("event_store"),
+        persist_workflow_db=True,
+    )
+
 CLAIM_SERVICE = ClaimService(
     claim_store=_REPOSITORIES.get("claim_store"),
     provider_decision_store=_REPOSITORIES.get("provider_decision_store"),
@@ -69,6 +79,7 @@ CLAIM_SERVICE = ClaimService(
 SIMULATION_MANAGER = SimulationManager(
     simulation_store=_REPOSITORIES.get("simulation_store"),
     document_store=LocalFileDocumentStore(),
+    claim_service_factory=make_sim_claim_service,
 )
 # Simulation-scoped claims must stay reachable through the main /api/claims
 # routes (timeline, versions, provider decisions, human resolution). The

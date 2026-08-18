@@ -704,6 +704,40 @@ def run_agent2_v1_pipeline(
                 audit.append("Routing: APPROVE is terminal; Agent2 not invoked.")
                 wf_transition(ClaimWorkflowState.APPROVED, "Agent1 APPROVE: terminal, no Agent2 recovery")
             elif decision.outcome == DecisionOutcome.HUMAN_REVIEW:
+                # Check if the human has resolved this hold in the current reentry cycle
+                reentry_event = None
+                for event in reversed(cp.events(wf_claim_id)):
+                    if event.state_after == ClaimWorkflowState.RESOLVED_REENTRY:
+                        reentry_event = event
+                        break
+                
+                if reentry_event and reentry_event.detail:
+                    note = reentry_event.detail
+                    if "Human review decision: APPROVE" in note:
+                        wf_transition(
+                            ClaimWorkflowState.APPROVED,
+                            "Human reviewer manually approved the claim",
+                            detail=note,
+                        )
+                        final_outcome_override = DecisionOutcome.APPROVE
+                        decision.outcome = DecisionOutcome.APPROVE
+                        decision.reason = note
+                        if hasattr(DecisionReasonCode, 'HUMAN_DECISION'):
+                            decision.reason_code = DecisionReasonCode.HUMAN_DECISION
+                        break
+                    elif "Human review decision: REJECT" in note:
+                        wf_transition(
+                            ClaimWorkflowState.REJECTED,
+                            "Human reviewer manually rejected the claim",
+                            detail=note,
+                        )
+                        final_outcome_override = DecisionOutcome.REJECT
+                        decision.outcome = DecisionOutcome.REJECT
+                        decision.reason = note
+                        if hasattr(DecisionReasonCode, 'HUMAN_DECISION'):
+                            decision.reason_code = DecisionReasonCode.HUMAN_DECISION
+                        break
+
                 audit.append("Routing: HUMAN_REVIEW is terminal; no direct Agent2 recovery.")
                 human_review_reasons.append("Agent1 escalated to HUMAN_REVIEW; no direct Agent2 recovery.")
                 wf_transition(

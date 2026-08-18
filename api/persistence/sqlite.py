@@ -106,8 +106,15 @@ class SqliteClaimRecordRepository(ClaimRecordRepository, _SqliteStoreBase):
         # Simulation-scoped cleanup only (Phase 5B).
         conn = self._connect()
         try:
+            conn.execute("PRAGMA foreign_keys = ON;")
             cursor = conn.execute(
                 "DELETE FROM claim_records WHERE claim_id = ?;", (claim_id,)
+            )
+            conn.execute(
+                "DELETE FROM claims WHERE claim_id = ?;", (claim_id,)
+            )
+            conn.execute(
+                "DELETE FROM agent2_audit WHERE claim_id = ?;", (claim_id,)
             )
             conn.commit()
             return cursor.rowcount > 0

@@ -113,3 +113,7 @@ export async function submitReviewDecision(
   await resolveHumanReview(claimId, note);
   return { success: true, review_id: reviewId };
 }
+
+export function clearReviewsCache(): void {
+  resolvedThisSession.clear();
+}

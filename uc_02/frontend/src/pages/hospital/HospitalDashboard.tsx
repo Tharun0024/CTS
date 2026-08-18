@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { Plus, RefreshCcw, CheckCircle2, FileText, Clock, AlertTriangle, XCircle, ChevronRight, Shield, Play, Square, RotateCcw, Activity } from 'lucide-react';
+import { Plus, RefreshCcw, CheckCircle2, FileText, Clock, AlertTriangle, XCircle, Shield, Play, Square, RotateCcw, Activity, Users } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { getClaims, getClaimDetails } from '../../services/claimsApi';
+import { getClaims } from '../../services/claimsApi';
 import {
   startSimulationTrigger,
   getSimulationStatus,
@@ -11,10 +11,8 @@ import {
   listSimulations,
 } from '../../services/simulationApi';
 import type { SimulationStatus } from '../../services/simulationApi';
-import type { Claim, ClaimDetails } from '../../types/claim';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
+import type { Claim } from '../../types/claim';
 import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
 
 
 
@@ -24,7 +22,6 @@ export function HospitalDashboard() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [claims, setClaims] = useState<Claim[]>([]);
-  const [priorityClaims, setPriorityClaims] = useState<ClaimDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [simStatus, setSimStatus] = useState<SimulationStatus | null>(null);
   const [simActionBusy, setSimActionBusy] = useState(false);
@@ -41,9 +38,6 @@ export function HospitalDashboard() {
       .catch(() => {});
     getClaims().then(async (data) => {
       setClaims(data);
-      const priority = data.filter(c => ['REJECTED', 'MORE_INFO', 'HUMAN_REVIEW'].includes(c.status));
-      const detailed = await Promise.all(priority.slice(0, 5).map(c => getClaimDetails(c.claim_id).catch(() => null)));
-      setPriorityClaims(detailed.filter(Boolean) as ClaimDetails[]);
     }).finally(() => {
       if (showLoading) setLoading(false);
     });
@@ -122,9 +116,10 @@ export function HospitalDashboard() {
   const total = claims.length;
   const count = (s: string) => claims.filter(c => c.status === s).length;
   const accepted = count('ACCEPTED');
-  const processing = count('PROCESSING') + count('UNDER_REVIEW') + count('SUBMITTED');
+  const processing = claims.filter(c => ['PROCESSING', 'UNDER_REVIEW', 'SUBMITTED', 'SUBMITTED_AGAIN', 'RESUBMISSION_CHECK', 'DRAFT'].includes(c.status)).length;
   const needsInfo = count('MORE_INFO');
   const rejected = count('REJECTED');
+  const humanReview = count('HUMAN_REVIEW');
 
   const pct = (num: number) => total > 0 ? Math.round((num / total) * 100) : 0;
 
@@ -134,6 +129,7 @@ export function HospitalDashboard() {
     { label: 'Processing', value: processing, sub: `${pct(processing)}% in pipeline`, icon: Clock, gradient: 'from-blue-600 to-indigo-700', path: '/hospital/claims' },
     { label: 'Needs Info', value: needsInfo, sub: needsInfo > 0 ? 'Action required' : 'All clear', icon: AlertTriangle, gradient: needsInfo > 0 ? 'from-amber-500 to-orange-600' : 'from-amber-400 to-amber-600', path: '/hospital/claims' },
     { label: 'Denied', value: rejected, sub: `${pct(rejected)}% rejection rate`, icon: XCircle, gradient: 'from-rose-600 to-red-700', path: '/hospital/claims' },
+    { label: 'Human Review', value: humanReview, sub: `${pct(humanReview)}% hold`, icon: Users, gradient: 'from-indigo-600 to-indigo-850', path: '/hospital/claims' },
   ];
 
   // V1 Workflow stats
@@ -151,18 +147,7 @@ export function HospitalDashboard() {
     { label: 'Resubmissions', value: resubmissionsCount, desc: 'Re-evaluation in progress', icon: Shield, color: 'text-indigo-600', bg: 'bg-indigo-50' },
   ];
 
-  const statusDisplay: Record<string, string> = {
-    // Exact V1 outcome labels for decision badges.
-    'REJECTED': 'REJECT',
-    'MORE_INFO': 'REQUEST MORE INFORMATION',
-    'HUMAN_REVIEW': 'HUMAN REVIEW',
-  };
 
-  const statusBadgeVariant: Record<string, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
-    'REJECTED': 'error',
-    'MORE_INFO': 'warning',
-    'HUMAN_REVIEW': 'info',
-  };
 
   // Mock data for charts
   return (
@@ -362,59 +347,7 @@ export function HospitalDashboard() {
         </div>
       )}
 
-      {/* Priority Claims */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-amber-500" />
-            Priority Claims
-          </CardTitle>
-          <CardDescription>Claims requiring immediate attention or review</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => <div key={i} className="bg-slate-100 rounded-lg h-16 animate-pulse" />)}
-            </div>
-          ) : priorityClaims.length === 0 ? (
-            <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-8 text-center">
-              <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-3" />
-              <h3 className="text-sm font-semibold text-slate-700 mb-1">No priority claims</h3>
-              <p className="text-slate-500 text-sm">All claims are proceeding normally.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {priorityClaims.map((claim) => (
-                <div
-                  key={claim.claim_id}
-                  className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-lg hover:border-emerald-300 hover:shadow-sm cursor-pointer transition-all"
-                  onClick={() => navigate(`/hospital/claims/${claim.claim_id}`)}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="mt-1">
-                      {claim.status === 'REJECTED' ? <XCircle className="w-5 h-5 text-red-500" /> : <AlertTriangle className="w-5 h-5 text-amber-500" />}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-slate-900">{claim.claim_id}</span>
-                        <Badge variant={statusBadgeVariant[claim.status] || 'default'}>
-                          {statusDisplay[claim.status] || claim.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-slate-600">{claim.claim.procedure}</p>
-                      <div className="flex items-center gap-4 mt-1.5 text-xs text-slate-500">
-                        <span>Patient: <span className="font-medium text-slate-700">{claim.patient.patient_id}</span></span>
-                        <span>Payer: <span className="font-medium text-slate-700">{claim.policy.payer}</span></span>
-                      </div>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-slate-400 flex-shrink-0" />
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+
 
     </div>
   );

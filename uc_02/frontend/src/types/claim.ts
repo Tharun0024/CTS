@@ -63,10 +63,18 @@ export interface Claim {
 }
 
 export interface PolicyEvidenceItem {
-  criterion: string;
-  patient_value: string;
-  status: 'MET' | 'NOT_MET';
-  source: string;
+  criterion?: string;
+  patient_value?: string;
+  status?: 'MET' | 'NOT_MET';
+  source?: string;
+  evidence_id?: string;
+  evidence_key?: string;
+  content_reference?: string;
+  source_record_id?: string;
+  event_date?: string;
+  provenance?: string;
+  sensitive?: boolean;
+  sensitivity_reason?: string | null;
 }
 
 export interface ClaimDecision {

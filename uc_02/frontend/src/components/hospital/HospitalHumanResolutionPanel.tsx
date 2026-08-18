@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2, CheckCircle2, ShieldAlert } from 'lucide-react';
-import { resolveHumanReview } from '../../services/claimsApi';
+import { resolveHumanReview, clearClaimsCache } from '../../services/claimsApi';
+import { clearReviewsCache } from '../../services/reviewApi';
 import type { ClaimDetails } from '../../types/claim';
 
 interface HospitalHumanResolutionPanelProps {
@@ -14,11 +15,14 @@ export function HospitalHumanResolutionPanel({ claim, onResolved }: HospitalHuma
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
 
-  const handleResolve = async () => {
+  const handleResolve = async (decision: 'APPROVE' | 'REJECT') => {
     setLoading(true);
     setError('');
     try {
-      await resolveHumanReview(claim.claim_id, note || 'Resolved by provider manual verification and release confirmation.');
+      const fullNote = `Human review decision: ${decision}. Note: ${note || 'Resolved by provider manual review hold resolution.'}`;
+      await resolveHumanReview(claim.claim_id, fullNote);
+      clearClaimsCache();
+      clearReviewsCache();
       setDone(true);
       onResolved?.();
     } catch {
@@ -55,7 +59,7 @@ export function HospitalHumanResolutionPanel({ claim, onResolved }: HospitalHuma
 
       <div className="p-5 space-y-4">
         <p className="text-[12px] text-slate-600 font-semibold leading-relaxed">
-          Provide a clinical justification or document reference to manually resolve this review hold. The claim will re-enter normal classification.
+          Provide a clinical justification or document reference to resolve this review hold and re-enter normal evaluation.
         </p>
 
         <div>
@@ -77,19 +81,23 @@ export function HospitalHumanResolutionPanel({ claim, onResolved }: HospitalHuma
           </p>
         )}
 
-        <button
-          onClick={handleResolve}
-          disabled={loading || !note.trim()}
-          className="w-full inline-flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-white text-[13px] font-extrabold rounded-xl transition-all shadow-md shadow-emerald-100"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" /> Submitting Resolution…
-            </>
-          ) : (
-            'Submit & Resume Automated Evaluation'
-          )}
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => handleResolve('APPROVE')}
+            disabled={loading || !note.trim()}
+            className="flex-1 inline-flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-white text-[13px] font-extrabold rounded-xl transition-all shadow-md shadow-emerald-100"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Approve Claim'}
+          </button>
+          
+          <button
+            onClick={() => handleResolve('REJECT')}
+            disabled={loading || !note.trim()}
+            className="flex-1 inline-flex items-center justify-center gap-2 py-3 bg-rose-600 hover:bg-rose-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-white text-[13px] font-extrabold rounded-xl transition-all shadow-md shadow-rose-100"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Reject Claim'}
+          </button>
+        </div>
       </div>
     </div>
   );

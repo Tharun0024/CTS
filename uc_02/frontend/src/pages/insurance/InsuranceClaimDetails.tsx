@@ -5,22 +5,20 @@ import { PatientInfoCard } from '../../components/shared/PatientInfoCard';
 import { PolicyEvidencePanel } from '../../components/shared/PolicyEvidencePanel';
 import { ClaimTimeline } from '../../components/shared/ClaimTimeline';
 import { HumanReviewWorkspace } from '../../components/shared/HumanReviewWorkspace';
-import { DecisionPanel } from '../../components/insurance/DecisionPanel';
 import { LoadingState } from '../../components/common/LoadingState';
 import { ErrorState } from '../../components/common/ErrorState';
 import { getInsuranceClaimDetails } from '../../services/insuranceApi';
 import { PolicyModal } from '../../components/shared/PolicyModal';
 import { decisionLabel } from '../../utils/decisionHumanizer';
 import { usePolling, isTerminalStatus } from '../../services/polling';
-import type { ClaimDetails, ClaimVersion, DecisionStatus } from '../../types/claim';
-import { Loader2, Shield } from 'lucide-react';
+import type { ClaimDetails, ClaimVersion } from '../../types/claim';
+import { Loader2, Shield, Clock } from 'lucide-react';
 
 export function InsuranceClaimDetails() {
   const { id } = useParams<{ id: string }>();
   const [claim, setClaim] = useState<ClaimDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [decisionMade, setDecisionMade] = useState<DecisionStatus | null>(null);
   const [isPolicyOpen, setIsPolicyOpen] = useState(false);
 
   const fetchClaim = useCallback(async () => {
@@ -89,14 +87,7 @@ export function InsuranceClaimDetails() {
         </div>
       )}
 
-      {/* Decision confirmed banner */}
-      {decisionMade && (
-        <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3.5 shadow-sm animate-fade-in-up">
-          <p className="text-xs font-bold text-green-800">
-            ✓ Decision submitted: <span className="font-extrabold">{decisionMade.replace('_', ' ')}</span>
-          </p>
-        </div>
-      )}
+
 
       {/* 3-col grid: main | decision */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -259,15 +250,23 @@ export function InsuranceClaimDetails() {
         {/* Right: Decision Panel + Timeline + policy reference + documents */}
         <div className="space-y-4">
           {claim.status === 'HUMAN_REVIEW' && (
-            <DecisionPanel
-              claimId={claim.claim_id}
-              recommendation={claim.decision?.status}
-              reason={claim.decision?.reason}
-              onDecisionMade={(d) => {
-                setDecisionMade(d);
-                fetchClaim();
-              }}
-            />
+            claim.agent2_invoked ? (
+              <div className="bg-amber-50 border border-amber-250 rounded-2xl p-4.5 text-center shadow-sm animate-fade-in-up">
+                <Clock className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+                <p className="text-xs font-black text-amber-900 uppercase tracking-wider">Provider/Hospital Resolution Pending</p>
+                <p className="text-[11px] text-amber-700 mt-1.5 font-semibold leading-relaxed">
+                  This claim is held for provider evidence release consent. Waiting for hospital resolution.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-blue-50 border border-blue-250 rounded-2xl p-4.5 text-center shadow-sm animate-fade-in-up">
+                <Clock className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+                <p className="text-xs font-black text-blue-900 uppercase tracking-wider">Hospital Clinical Resolution Pending</p>
+                <p className="text-[11px] text-blue-700 mt-1.5 font-semibold leading-relaxed">
+                  This claim requires manual clinical review and resolution by the hospital provider.
+                </p>
+              </div>
+            )
           )}
           {claim.timeline && (
             <ClaimTimeline events={claim.timeline} portal="insurance" />

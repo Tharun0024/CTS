@@ -19,7 +19,7 @@ class StartSimulationRequest(BaseModel):
     """
 
     source: str = "CMS Medicare simulation scenario"
-    count: int = Field(default=5, ge=1, le=200)
+    count: Optional[int] = Field(default=None, ge=1, le=200)
     policy_id: Optional[str] = None  # default: first policy in the loaded RAG chunks
     provider_decision: str = "ACCEPT"
     max_resubmissions: Optional[int] = Field(default=None, ge=0)

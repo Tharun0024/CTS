@@ -66,10 +66,6 @@ export function usePolling<T>(
 export const TERMINAL_STATUSES = new Set([
   'ACCEPTED',
   'REJECTED',
-  'MORE_INFO',
-  'HUMAN_REVIEW',
-  'RESUBMISSION_CHECK',
-  'SUBMITTED_AGAIN',
   'DRAFT',
 ]);
 

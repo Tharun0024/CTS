@@ -4,6 +4,7 @@
 
 import { apiFetch } from './api';
 import { clearClaimsCache } from './claimsApi';
+import { clearReviewsCache } from './reviewApi';
 
 interface StartSimulationRequest {
   source: string;
@@ -47,7 +48,6 @@ export async function startSimulationTrigger(
       method: 'POST',
       body: JSON.stringify({
         source: payload.source,
-        count: payload.count ?? 5,
         pause_seconds: 45.0, // UI simulation runs are paced at 45s per patient
       }),
     });
@@ -80,6 +80,7 @@ export async function resetSimulation(simulationId?: string): Promise<unknown> {
   const query = simulationId ? `?simulation_id=${encodeURIComponent(simulationId)}` : '';
   const result = await apiFetch(`/simulation/reset${query}`, { method: 'POST' });
   clearClaimsCache();
+  clearReviewsCache();
   localStorage.removeItem('orca_read_notifications');
   return result;
 }

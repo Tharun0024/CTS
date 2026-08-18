@@ -4,7 +4,6 @@ import { PatientInfoCard } from '../../components/shared/PatientInfoCard';
 import { ClinicalInfoCard } from '../../components/shared/ClinicalInfoCard';
 import { PolicyEvidencePanel } from '../../components/shared/PolicyEvidencePanel';
 import { ClaimTimeline } from '../../components/shared/ClaimTimeline';
-import { HumanReviewPanel } from '../../components/insurance/HumanReviewPanel';
 import { LoadingState } from '../../components/common/LoadingState';
 import { ErrorState } from '../../components/common/ErrorState';
 import { getReviewDetails } from '../../services/reviewApi';
@@ -19,7 +18,6 @@ export function ReviewDetail() {
   const [review, setReview] = useState<ReviewDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [done, setDone] = useState(false);
 
   const fetchData = () => {
     if (!id) return;
@@ -80,11 +78,7 @@ export function ReviewDetail() {
         </div>
       </div>
 
-      {done && (
-        <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3.5 shadow-sm animate-fade-in-up">
-          <p className="text-xs font-bold text-green-800">✓ Decision submitted — this review is now complete.</p>
-        </div>
-      )}
+
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* Left: claim data */}
@@ -124,13 +118,22 @@ export function ReviewDetail() {
 
         {/* Right: human review panel + timeline */}
         <div className="space-y-4">
-          {!done && (
-            <HumanReviewPanel
-              reviewId={review.review_id}
-              aiRecommendation={review.ai_recommendation}
-              aiConfidence={review.ai_confidence}
-              onDecisionMade={() => setDone(true)}
-            />
+          {claim.agent2_invoked ? (
+            <div className="bg-amber-50 border border-amber-250 rounded-2xl p-4.5 text-center shadow-sm animate-fade-in-up">
+              <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+              <p className="text-xs font-black text-amber-900 uppercase tracking-wider">Provider/Hospital Resolution Pending</p>
+              <p className="text-[11px] text-amber-700 mt-1.5 font-semibold leading-relaxed">
+                This claim is held for provider evidence release consent. Waiting for hospital resolution.
+              </p>
+            </div>
+          ) : (
+            <div className="bg-blue-50 border border-blue-250 rounded-2xl p-4.5 text-center shadow-sm animate-fade-in-up">
+              <AlertTriangle className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+              <p className="text-xs font-black text-blue-900 uppercase tracking-wider">Hospital Clinical Resolution Pending</p>
+              <p className="text-[11px] text-blue-700 mt-1.5 font-semibold leading-relaxed">
+                This claim requires manual clinical review and resolution by the hospital provider.
+              </p>
+            </div>
           )}
           {claim.timeline && <ClaimTimeline events={claim.timeline} />}
         </div>

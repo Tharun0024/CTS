@@ -43,6 +43,43 @@ class RuntimeAdapter:
         self.provider_db = str(provider_db or base_dir / "DATA-VERSION1" / "big_patient_data.db")
         self.payer_db = str(payer_db or base_dir / "DATA-VERSION1" / "payer_data.db")
 
+    def _resolve_sim_ids(self, patient_id: Optional[str], claim_id: Optional[str] = None) -> Tuple[str, Optional[str]]:
+        real_patient_id = patient_id
+        real_claim_id = claim_id
+        
+        if patient_id and "-SIM-" in patient_id:
+            parts = patient_id.split("-")
+            try:
+                seq = int(parts[-1])
+            except ValueError:
+                seq = 1
+                
+            sqlite3 = importlib.import_module("sqlite3")
+            conn = sqlite3.connect(self.provider_db)
+            try:
+                cur = conn.execute("SELECT claim_id, patient_id, scenario_type FROM claims ORDER BY claim_id")
+                claims_rows = cur.fetchall()
+            finally:
+                conn.close()
+                self._cleanup_sqlite_module()
+                
+            scenario = ("COMPLETE", "MISSING_EVIDENCE", "NOT_SATISFIED")[(seq - 1) % 3]
+            
+            complete_claims = [r for r in claims_rows if r[2] == "COMPLETE"]
+            omitted_claims = [r for r in claims_rows if r[2] == "EVIDENCE_OMITTED"]
+            
+            if scenario == "COMPLETE" and complete_claims:
+                row = complete_claims[(seq - 1) % len(complete_claims)]
+            elif scenario == "MISSING_EVIDENCE" and omitted_claims:
+                row = omitted_claims[(seq - 1) % len(omitted_claims)]
+            else:
+                row = complete_claims[(seq - 1) % len(complete_claims)] if complete_claims else claims_rows[(seq - 1) % len(claims_rows)]
+                
+            real_claim_id = row[0]
+            real_patient_id = row[1]
+            
+        return real_patient_id, real_claim_id
+
     @staticmethod
     def normalize_payer_alias(payer_name: Optional[str]) -> Optional[str]:
         """Resolve known payer naming aliases without inventing a payer."""
@@ -137,25 +174,31 @@ class RuntimeAdapter:
         if not patient_id:
             return None
 
+        patient_id_orig = patient_id
+        claim_id_orig = claim_id
+
+        # Resolve simulation IDs
+        real_patient_id, real_claim_id = self._resolve_sim_ids(patient_id, claim_id)
+
         patient_row = self._fetch_one(
             self.provider_db,
-            "SELECT patient_id, age, gender FROM patients WHERE patient_id = ?",
-            (patient_id,),
+            "SELECT patient_id, age, gender, birth_date, first_name, last_name, address, city, state, zip FROM patients WHERE patient_id = ?",
+            (real_patient_id,),
         )
         if patient_row is None:
             return None
 
-        if claim_id:
+        if real_claim_id:
             claim_row = self._fetch_one(
                 self.provider_db,
                 "SELECT claim_id, patient_id, payer, policy_id, procedure_code, procedure_description, created_at, scenario_type FROM claims WHERE patient_id = ? AND claim_id = ? ORDER BY created_at DESC LIMIT 1",
-                (patient_id, claim_id),
+                (real_patient_id, real_claim_id),
             )
         else:
             claim_row = self._fetch_one(
                 self.provider_db,
                 "SELECT claim_id, patient_id, payer, policy_id, procedure_code, procedure_description, created_at, scenario_type FROM claims WHERE patient_id = ? ORDER BY created_at DESC LIMIT 1",
-                (patient_id,),
+                (real_patient_id,),
             )
 
         if claim_row is None:
@@ -228,6 +271,9 @@ class RuntimeAdapter:
 
         clinical_metrics: Dict[str, Any] = {
             "patient_gender": patient_row["gender"],
+            "patient_name": f"{patient_row['first_name']} {patient_row['last_name']}",
+            "patient_dob": patient_row["birth_date"],
+            "patient_address": f"{patient_row['address']}, {patient_row['city']}, {patient_row['state']} {patient_row['zip']}",
             "claim_scenario_type": claim_row["scenario_type"],
             "claim_payer": claim_row["payer"],
             "claim_policy_id": claim_row["policy_id"],
@@ -241,14 +287,16 @@ class RuntimeAdapter:
                         if key not in clinical_metrics:
                             clinical_metrics[key] = value
 
+        claim_id_ret = claim_id_orig if claim_id_orig else (f"CLM-{patient_id_orig}" if patient_id_orig.startswith("SIM-") else claim_id)
+
         return {
-            "claim_id": claim_id,
+            "claim_id": claim_id_ret,
             "submission": {
                 "attempt": selected_attempt,
                 "date": submission_row["timestamp"],
             },
             "case_data": {
-                "case_id": claim_id,
+                "case_id": claim_id_ret,
                 "patient_age": patient_age,
                 "diagnoses": diagnoses,
                 "procedures": procedures,
@@ -269,10 +317,12 @@ class RuntimeAdapter:
         if not patient_id:
             return []
 
+        real_patient_id, _ = self._resolve_sim_ids(patient_id)
+
         rows = self._fetch_all(
             self.provider_db,
             "SELECT evidence_id, patient_id, source_type, source_record_id, document_id, evidence_type, event_date, content_reference, provenance, sensitivity FROM evidence WHERE patient_id = ? ORDER BY evidence_id",
-            (patient_id,),
+            (real_patient_id,),
         )
 
         pool: List[Dict[str, Any]] = []
@@ -390,10 +440,13 @@ class RuntimeAdapter:
         if not member_id:
             return None
 
+        member_id_orig = member_id
+        real_member_id, _ = self._resolve_sim_ids(member_id)
+
         member_row = self._fetch_one(
             self.payer_db,
             "SELECT member_id, payer_id, plan_id, coverage_status, coverage_start, coverage_end, plan_product FROM members WHERE member_id = ?",
-            (member_id,),
+            (real_member_id,),
         )
         if member_row is None:
             return None
@@ -401,7 +454,7 @@ class RuntimeAdapter:
         eligibility_row = self._fetch_one(
             self.payer_db,
             "SELECT eligibility_id, member_id, is_eligible, effective_date, termination_date FROM eligibility WHERE member_id = ? ORDER BY effective_date DESC LIMIT 1",
-            (member_id,),
+            (real_member_id,),
         )
 
         benefits = self._fetch_all(
@@ -413,19 +466,19 @@ class RuntimeAdapter:
         utilization = self._fetch_all(
             self.payer_db,
             "SELECT utilization_id, member_id, metric_name, metric_value, updated_at FROM utilization WHERE member_id = ? ORDER BY updated_at DESC",
-            (member_id,),
+            (real_member_id,),
         )
 
         prior_authorizations = self._fetch_all(
             self.payer_db,
             "SELECT authorization_id, member_id, requested_service, diagnosis_code, provider, authorization_status, request_date, decision_date FROM prior_authorizations WHERE member_id = ? ORDER BY request_date DESC",
-            (member_id,),
+            (real_member_id,),
         )
 
         payer_claims = self._fetch_all(
             self.payer_db,
             "SELECT claim_id, member_id, service_date, provider_facility, claim_type, procedure_code, diagnosis_code, claim_status, allowed_amount, paid_amount, denial_reason FROM payer_claims WHERE member_id = ? ORDER BY service_date DESC",
-            (member_id,),
+            (real_member_id,),
         )
 
         eligibility = {
@@ -435,7 +488,7 @@ class RuntimeAdapter:
         }
 
         return {
-            "member_id": member_row["member_id"],
+            "member_id": member_id_orig,
             "payer_id": member_row["payer_id"],
             "plan_id": member_row["plan_id"],
             "coverage": {
