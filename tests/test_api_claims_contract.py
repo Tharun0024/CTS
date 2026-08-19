@@ -450,7 +450,7 @@ class TestHumanReviewLifecycle:
     def test_resolution_without_evidence_repeats_deterministically(self, hr_client):
         resolved = hr_client.post(
             "/api/claims/CLM-API-HR/human-resolution",
-            json={"resolution_note": "No additional records available."},
+            json={"resolution_note": "No additional records available.", "resolved_by": "insurance"},
         )
         assert resolved.status_code == 200
         body = resolved.json()
@@ -471,6 +471,7 @@ class TestHumanReviewLifecycle:
                 "attached_evidence": [
                     _ev("metformin_trial", "EV-API-HUMAN", {"verified_facts": True}),
                 ],
+                "resolved_by": "insurance",
             },
         )
         assert resolved.status_code == 200
@@ -487,13 +488,13 @@ class TestHumanReviewLifecycle:
         client2, _ = _make_client(_ldl_chunks(), _ldl_pool())
         claim = _scenario_claim("CLM-API-HR2", "POL-API-LDL")
         client2.post("/api/claims", json={"canonical_claim": claim})
-        blocked = client2.post("/api/claims/CLM-API-HR2/human-resolution", json={})
+        blocked = client2.post("/api/claims/CLM-API-HR2/human-resolution", json={"resolved_by": "insurance"})
         assert blocked.status_code == 409
 
     def test_fabricated_attachment_rejected(self, hr_client):
         bad = hr_client.post(
             "/api/claims/CLM-API-HR/human-resolution",
-            json={"attached_evidence": [{"extracted_facts": {"made_up": True}}]},
+            json={"attached_evidence": [{"extracted_facts": {"made_up": True}}], "resolved_by": "insurance"},
         )
         assert bad.status_code == 422
 

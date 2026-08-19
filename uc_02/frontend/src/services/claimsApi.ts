@@ -104,13 +104,14 @@ export async function getProviderDecisions(claimId: string): Promise<unknown[]> 
 // (the backend rejects any non-hospital resolver).
 export async function resolveHumanReview(
   claimId: string,
-  resolutionNote: string
+  resolutionNote: string,
+  resolvedBy: string = 'hospital'
 ): Promise<ClaimDetails> {
   const record = await apiFetch<BackendRecord>(
     `/claims/${encodeURIComponent(claimId)}/human-resolution`,
     {
       method: 'POST',
-      body: JSON.stringify({ resolution_note: resolutionNote, resolved_by: 'hospital' }),
+      body: JSON.stringify({ resolution_note: resolutionNote, resolved_by: resolvedBy }),
     }
   );
   const details = toClaimDetails(record);

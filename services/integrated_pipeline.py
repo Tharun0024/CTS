@@ -661,6 +661,16 @@ def _latest_human_resolution_note(cp, claim_id: str) -> Optional[str]:
     return None
 
 
+def _latest_reentry_resolution_note(cp, claim_id: str) -> Optional[str]:
+    """Latest RESOLVED_REENTRY note, if any."""
+    from agent2.workflow.control_plane import ClaimWorkflowState
+
+    for event in reversed(cp.events(claim_id)):
+        if event.state_after == ClaimWorkflowState.RESOLVED_REENTRY and event.detail:
+            return event.detail
+    return None
+
+
 def run_agent2_v1_pipeline(
     canonical_claim: Dict[str, Any],
     components: Dict[str, Any],
@@ -705,7 +715,7 @@ def run_agent2_v1_pipeline(
 
     if recovery_source is None:
         recovery_source = _default_recovery_source_factory()
-    cap = max_resubmissions if max_resubmissions is not None else MAX_RESUBMISSION_ATTEMPTS
+    cap = min(max_resubmissions if max_resubmissions is not None else MAX_RESUBMISSION_ATTEMPTS, 1)
 
     audit: List[str] = []
     versions: List[Dict[str, Any]] = []
@@ -728,6 +738,7 @@ def run_agent2_v1_pipeline(
     wf_claim_id = str(canonical_claim.get("claim_id") or "UNKNOWN-CLAIM")
     # Version continuity across runs sharing one control plane (re-entry).
     wf_version_offset = max(0, cp.current_version(wf_claim_id) - 1)
+    resubmissions = wf_version_offset
 
     def wf_transition(state, action, version=None, correlation_id=None, erqid=None, detail=None):
         return cp.transition(
@@ -787,6 +798,17 @@ def run_agent2_v1_pipeline(
 
     while True:
         route = classify_decision_for_agent2(decision)
+        resolution_note = _latest_reentry_resolution_note(cp, wf_claim_id)
+        if (
+            route != _ROUTE_RECOVERABLE
+            and resolution_note
+            and "Human review decision: MORE_INFO" in resolution_note
+        ):
+            route = _ROUTE_RECOVERABLE
+            decision.outcome = DecisionOutcome.REQUEST_MORE_INFORMATION
+            human_verification_pending = False
+
+
         if route != _ROUTE_RECOVERABLE:
             if decision.outcome == DecisionOutcome.APPROVE:
                 audit.append("Routing: APPROVE is terminal; Agent2 not invoked.")
@@ -830,6 +852,7 @@ def run_agent2_v1_pipeline(
 
                 audit.append("Routing: HUMAN_REVIEW is terminal; no direct Agent2 recovery.")
                 human_review_reasons.append("Agent1 escalated to HUMAN_REVIEW; no direct Agent2 recovery.")
+                human_verification_pending = True
                 wf_transition(
                     ClaimWorkflowState.HUMAN_REVIEW,
                     "Agent1 HUMAN_REVIEW escalation; no direct Agent2 recovery",
@@ -891,6 +914,20 @@ def run_agent2_v1_pipeline(
                     )
             break
 
+        resolution_note = _latest_reentry_resolution_note(cp, wf_claim_id)
+        if resolution_note and "Human review decision: REJECT" in resolution_note:
+            reason = "Provider denied information request. Terminated as REJECTED."
+            try:
+                decline_reason = resolution_note.split("Note:")[1].strip()
+            except Exception:
+                decline_reason = "Denied by provider information decision"
+            
+            wf_transition(ClaimWorkflowState.REJECTED, reason)
+            final_outcome_override = DecisionOutcome.REJECT
+            decision.outcome = DecisionOutcome.REJECT
+            decision.reasoning.append(decline_reason)
+            break
+
         wf_transition(
             ClaimWorkflowState.ROUTED_RECOVERY,
             "REQUEST_MORE_INFORMATION routed to Agent2 (only recoverable outcome)",
@@ -914,6 +951,7 @@ def run_agent2_v1_pipeline(
             )
             audit.append(reason)
             human_review_reasons.append(reason)
+            human_verification_pending = True
             wf_transition(ClaimWorkflowState.HUMAN_REVIEW, reason)
             final_outcome_override = DecisionOutcome.HUMAN_REVIEW
             break
@@ -988,6 +1026,7 @@ def run_agent2_v1_pipeline(
             reason = "No recoverable provider-side evidence found; nothing was fabricated. Escalating to HUMAN_REVIEW."
             audit.append(reason)
             human_review_reasons.append(reason)
+            human_verification_pending = True
             wf_transition(ClaimWorkflowState.HUMAN_REVIEW, reason, correlation_id=wf_correlation, erqid=wf_erq)
             final_outcome_override = DecisionOutcome.HUMAN_REVIEW
             break
@@ -1002,6 +1041,7 @@ def run_agent2_v1_pipeline(
             )
             audit.append(reason)
             human_review_reasons.append(reason)
+            human_verification_pending = True
             wf_transition(ClaimWorkflowState.HUMAN_REVIEW, reason, correlation_id=wf_correlation, erqid=wf_erq)
             final_outcome_override = DecisionOutcome.HUMAN_REVIEW
             break
@@ -1013,6 +1053,7 @@ def run_agent2_v1_pipeline(
             reason = "Recovered evidence failed provenance validation against the provider pool."
             audit.append(reason)
             human_review_reasons.append(reason)
+            human_verification_pending = True
             wf_transition(ClaimWorkflowState.HUMAN_REVIEW, reason, correlation_id=wf_correlation, erqid=wf_erq)
             final_outcome_override = DecisionOutcome.HUMAN_REVIEW
             break
@@ -1027,26 +1068,59 @@ def run_agent2_v1_pipeline(
             erqid=wf_erq,
         )
         released_ids = [item.get("evidence_id") for item in released]
+
+        # Check human resolution note first
+        resolution_note = _latest_reentry_resolution_note(cp, wf_claim_id)
+        effective_decision = provider_decision
+        decline_reason = None
+        if resolution_note:
+            if "Human review decision: PROVIDE_INFO" in resolution_note:
+                effective_decision = "ACCEPT"
+            elif "Human review decision: REJECT" in resolution_note:
+                effective_decision = "DECLINE"
+                try:
+                    decline_reason = resolution_note.split("Note:")[1].strip()
+                except Exception:
+                    decline_reason = "Denied by provider information decision"
+            elif "Human review decision: MORE_INFO" in resolution_note:
+                effective_decision = "DECLINE"
+
         cp.record_provider_decision(
             wf_claim_id,
-            provider_decision,
+            effective_decision,
             claim_version=len(versions) + wf_version_offset,
             evidence_ids=released_ids,
             evidence_request_id=wf_erq,
             correlation_id=wf_correlation,
-            reason="Recovered provider evidence consent gate",
+            reason=decline_reason or "Recovered provider evidence consent gate",
         )
-        if str(provider_decision).strip().upper() != "ACCEPT":
+        if str(effective_decision).strip().upper() != "ACCEPT":
             provider_declined = True
-            reason = (
-                f"Provider declined resubmission of recovered evidence "
-                f"(decision='{provider_decision}'); no V{len(versions) + 1} is built. "
-                "Escalating to HUMAN_REVIEW."
-            )
-            audit.append(reason)
-            human_review_reasons.append(reason)
-            wf_transition(ClaimWorkflowState.HUMAN_REVIEW, reason, correlation_id=wf_correlation, erqid=wf_erq)
-            final_outcome_override = DecisionOutcome.HUMAN_REVIEW
+            if resolution_note and "Human review decision: REJECT" in resolution_note:
+                reason = (
+                    f"Provider declined resubmission of recovered evidence "
+                    f"(decision='{effective_decision}'); no V{len(versions) + 1} is built. "
+                    "Terminated as REJECTED."
+                )
+                audit.append(reason)
+                human_review_reasons.append(reason)
+                wf_transition(ClaimWorkflowState.REJECTED, reason, correlation_id=wf_correlation, erqid=wf_erq)
+                final_outcome_override = DecisionOutcome.REJECT
+                decision.outcome = DecisionOutcome.REJECT
+                if decline_reason:
+                    decision.reasoning.append(decline_reason)
+                else:
+                    decision.reasoning.append(reason)
+            else:
+                reason = (
+                    f"Provider declined resubmission of recovered evidence "
+                    f"(decision='{effective_decision}'); no V{len(versions) + 1} is built. "
+                    "Escalating to HUMAN_REVIEW."
+                )
+                audit.append(reason)
+                human_review_reasons.append(reason)
+                wf_transition(ClaimWorkflowState.HUMAN_REVIEW, reason, correlation_id=wf_correlation, erqid=wf_erq)
+                final_outcome_override = DecisionOutcome.HUMAN_REVIEW
             break
 
         next_claim, delta_ids = _build_next_version_claim(current_claim, released)

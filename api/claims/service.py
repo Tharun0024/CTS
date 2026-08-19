@@ -144,6 +144,7 @@ class ClaimService:
                 "claim_version": record.get("claim_version"),
                 "agent2_invoked": record.get("agent2_invoked"),
                 "resubmissions": record.get("resubmissions"),
+                "human_verification_pending": record.get("human_verification_pending"),
                 "updated_at": record.get("updated_at"),
                 "procedure": metrics.get("claim_procedure") or (
                     procedures[0] if procedures else None
@@ -223,6 +224,22 @@ class ClaimService:
         )
         serialized = serialize_provider_decision(persisted)
         self.provider_decision_store.save(serialized)
+
+        from agent2.workflow.control_plane import ClaimWorkflowState
+        if self.components is not None and self.control_plane.current_state(claim_id) == ClaimWorkflowState.AWAITING_PROVIDER_DECISION:
+            from services.integrated_pipeline import run_agent2_v1_pipeline
+            result = run_agent2_v1_pipeline(
+                record["canonical_claim"],
+                self.components,
+                recovery_source=self.recovery_source,
+                provider_decision=decision,
+                control_plane=self.control_plane,
+            )
+            new_record = self._serialize_run(record["canonical_claim"], result)
+            self._merge_history(record, new_record)
+            self.claim_store.save(new_record)
+            self._sync_append_only(claim_id)
+
         return serialized
 
     def get_provider_decisions(self, claim_id: str) -> List[Dict[str, Any]]:
@@ -249,14 +266,24 @@ class ClaimService:
                 attached_evidence=attached_evidence,
                 resolved_by=resolved_by,
             )
-        # Phase 3: the Hospital portal is the ONLY side allowed to resolve a
-        # human review; Insurance stays strictly read-only for this state.
-        if str(resolved_by or "").strip().lower() != "hospital":
-            raise PermissionError(
-                "Only the hospital portal may resolve a human review; the "
-                "insurance portal is read-only for HUMAN_REVIEW claims."
-            )
         record = self._require_claim(claim_id)
+        if record.get("status") == "HUMAN_REVIEW":
+            is_verification = bool(record.get("human_verification_pending"))
+
+            if is_verification:
+                # Flow A: Agent 1 rejection/escalation. Only Insurance is allowed.
+                if str(resolved_by or "").strip().lower() != "insurance":
+                    raise PermissionError(
+                        "Only the insurance portal may resolve an Agent 1 human review; the "
+                        "hospital portal is read-only for Flow A claims."
+                    )
+            else:
+                # Flow B: Agent 2 provider decision. Only Hospital is allowed.
+                if str(resolved_by or "").strip().lower() != "hospital":
+                    raise PermissionError(
+                        "Only the hospital portal may resolve an Agent 2 information request; the "
+                        "insurance portal is read-only for Flow B claims."
+                    )
         if self.components is None:
             raise RuntimeError("ClaimService components are not configured.")
 
@@ -396,6 +423,12 @@ class ClaimService:
 
         for index, version in enumerate(current.get("versions") or []):
             version["version"] = f"V{offset + index + 1}"
+            if index == 0 and offset > 0:
+                prior_ev_ids = set(prior_versions[-1].get("evidence_ids") or [])
+                curr_ev_ids = set(version.get("evidence_ids") or [])
+                new_ids = list(curr_ev_ids - prior_ev_ids)
+                if new_ids:
+                    version["new_evidence_delta"] = new_ids
         for submission in current.get("submissions") or []:
             label = submission.get("version")
             if isinstance(label, str) and label.startswith("V"):

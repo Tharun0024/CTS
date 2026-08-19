@@ -16,6 +16,7 @@ import { decisionLabel } from '../../utils/decisionHumanizer';
 import { usePolling, isTerminalStatus } from '../../services/polling';
 import type { ClaimDetails, ClaimVersion } from '../../types/claim';
 import { Loader2, Shield, Clock } from 'lucide-react';
+import { InsuranceHumanResolutionPanel } from '../../components/insurance/InsuranceHumanResolutionPanel';
 
 export function InsuranceClaimDetails() {
   const { id } = useParams<{ id: string }>();
@@ -333,20 +334,14 @@ export function InsuranceClaimDetails() {
         {/* Right: Decision Panel + Timeline + policy reference + documents */}
         <div className="space-y-4">
           {claim.status === 'HUMAN_REVIEW' && (
-            claim.agent2_invoked ? (
+            claim.human_verification_pending ? (
+              <InsuranceHumanResolutionPanel claim={claim} onResolved={fetchClaim} />
+            ) : (
               <div className="bg-amber-50 border border-amber-250 rounded-2xl p-4.5 text-center shadow-sm animate-fade-in-up">
                 <Clock className="w-8 h-8 text-amber-500 mx-auto mb-2" />
-                <p className="text-xs font-black text-amber-900 uppercase tracking-wider">Provider/Hospital Resolution Pending</p>
+                <p className="text-xs font-black text-amber-900 uppercase tracking-wider">Awaiting Hospital Evidence Release Decision</p>
                 <p className="text-[11px] text-amber-700 mt-1.5 font-semibold leading-relaxed">
                   This claim is held for provider evidence release consent. Waiting for hospital resolution.
-                </p>
-              </div>
-            ) : (
-              <div className="bg-blue-50 border border-blue-250 rounded-2xl p-4.5 text-center shadow-sm animate-fade-in-up">
-                <Clock className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-                <p className="text-xs font-black text-blue-900 uppercase tracking-wider">Hospital Clinical Resolution Pending</p>
-                <p className="text-[11px] text-blue-700 mt-1.5 font-semibold leading-relaxed">
-                  This claim requires manual clinical review and resolution by the hospital provider.
                 </p>
               </div>
             )

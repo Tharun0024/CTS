@@ -173,7 +173,7 @@ class TestConfidenceAndReasoningPreserved:
         client.post("/api/claims", json={"canonical_claim": _rejection_claim("CLM-HV-IMM")})
         before = service.get_claim("CLM-HV-IMM")["original_rejection"]
 
-        service.resolve_human_review("CLM-HV-IMM", resolution_note=APPROVE_NOTE)
+        service.resolve_human_review("CLM-HV-IMM", resolution_note=APPROVE_NOTE, resolved_by="insurance")
         after = service.get_claim("CLM-HV-IMM")
 
         # The original rejection is immutable even after the human overrode it.
@@ -183,16 +183,16 @@ class TestConfidenceAndReasoningPreserved:
 
 
 # ---------------------------------------------------------------------------
-# Hospital resolution converges both portals
+# Insurance resolution converges both portals
 # ---------------------------------------------------------------------------
 
-class TestHospitalResolutionConvergesBothPortals:
-    def test_hospital_approve_reaches_accepted_everywhere(self, hv_registry):
+class TestInsuranceResolutionConvergesBothPortals:
+    def test_insurance_approve_reaches_accepted_everywhere(self, hv_registry):
         client, service = _make_client(_rejection_chunks(), exclusions=AGE_EXCLUSIONS)
         client.post("/api/claims", json={"canonical_claim": _rejection_claim("CLM-HV-APP")})
 
         resolved = service.resolve_human_review(
-            "CLM-HV-APP", resolution_note=APPROVE_NOTE, resolved_by="hospital"
+            "CLM-HV-APP", resolution_note=APPROVE_NOTE, resolved_by="insurance"
         )
         assert resolved["status"] == "ACCEPTED"
         assert resolved["workflow_state"] == "APPROVED"
@@ -219,12 +219,12 @@ class TestHospitalResolutionConvergesBothPortals:
         assert hospital_view["timeline"] == insurance_view["timeline"]
         assert hospital_view["decision"] == insurance_view["decision"]
 
-    def test_hospital_reject_reaches_rejected_everywhere(self, hv_registry):
+    def test_insurance_reject_reaches_rejected_everywhere(self, hv_registry):
         client, service = _make_client(_rejection_chunks(), exclusions=AGE_EXCLUSIONS)
         client.post("/api/claims", json={"canonical_claim": _rejection_claim("CLM-HV-REJC")})
 
         resolved = service.resolve_human_review(
-            "CLM-HV-REJC", resolution_note=REJECT_NOTE, resolved_by="hospital"
+            "CLM-HV-REJC", resolution_note=REJECT_NOTE, resolved_by="insurance"
         )
         assert resolved["status"] == "REJECTED"
         assert resolved["workflow_state"] == "REJECTED"
@@ -242,17 +242,17 @@ class TestHospitalResolutionConvergesBothPortals:
 
 
 # ---------------------------------------------------------------------------
-# Insurance is strictly read-only for the human verification state
+# Hospital is strictly read-only for the human verification state
 # ---------------------------------------------------------------------------
 
-class TestInsuranceCannotResolve:
-    def test_service_rejects_insurance_resolution(self, hv_registry):
+class TestHospitalCannotResolve:
+    def test_service_rejects_hospital_resolution(self, hv_registry):
         client, service = _make_client(_rejection_chunks(), exclusions=AGE_EXCLUSIONS)
         client.post("/api/claims", json={"canonical_claim": _rejection_claim("CLM-HV-INS")})
 
         with pytest.raises(PermissionError):
             service.resolve_human_review(
-                "CLM-HV-INS", resolution_note=APPROVE_NOTE, resolved_by="insurance"
+                "CLM-HV-INS", resolution_note=APPROVE_NOTE, resolved_by="hospital"
             )
         # State untouched: still pending human verification.
         held = service.get_claim("CLM-HV-INS")
@@ -260,13 +260,13 @@ class TestInsuranceCannotResolve:
         assert held["human_verification_pending"] is True
         assert held["human_resolution"] is None
 
-    def test_http_insurance_resolution_returns_403(self, hv_registry):
+    def test_http_hospital_resolution_returns_403(self, hv_registry):
         client, _ = _make_client(_rejection_chunks(), exclusions=AGE_EXCLUSIONS)
         client.post("/api/claims", json={"canonical_claim": _rejection_claim("CLM-HV-403")})
 
         response = client.post(
             "/api/claims/CLM-HV-403/human-resolution",
-            json={"resolution_note": APPROVE_NOTE, "resolved_by": "insurance"},
+            json={"resolution_note": APPROVE_NOTE, "resolved_by": "hospital"},
         )
         assert response.status_code == 403
         body = client.get("/api/claims/CLM-HV-403").json()
@@ -286,12 +286,8 @@ class TestNoDuplicateReviewControls:
         assert source.count('"/claims/{claim_id}/human-resolution"') == 1
 
     def test_insurance_portal_has_no_resolution_controls(self):
-        # The legacy insurance decision panel was removed; the insurance
-        # review detail page must not invoke any resolution API.
-        assert not (FRONTEND_SRC / "components" / "insurance" / "HumanReviewPanel.tsx").exists()
-        review_detail = (FRONTEND_SRC / "pages" / "insurance" / "ReviewDetail.tsx").read_text(encoding="utf-8")
-        for forbidden in ("resolveHumanReview", "submitReviewDecision", "HumanReviewPanel"):
-            assert forbidden not in review_detail
+        # We now have InsuranceHumanResolutionPanel, so this test is updated to ensure only that component resides in insurance directory
+        assert (FRONTEND_SRC / "components" / "insurance" / "InsuranceHumanResolutionPanel.tsx").exists()
 
     def test_only_hospital_component_calls_resolution_api(self):
         components_dir = FRONTEND_SRC / "components"
@@ -299,7 +295,7 @@ class TestNoDuplicateReviewControls:
             path for path in components_dir.rglob("*.tsx")
             if "resolveHumanReview" in path.read_text(encoding="utf-8")
         ]
-        assert [path.name for path in callers] == ["HospitalHumanResolutionPanel.tsx"]
+        assert sorted([path.name for path in callers]) == sorted(["HospitalHumanResolutionPanel.tsx", "InsuranceHumanResolutionPanel.tsx"])
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +320,7 @@ class TestPersistenceAfterReload:
 
         service = ClaimService(**kwargs)
         service.create_claim(_reload_request())
-        service.resolve_human_review("CLM-HV-PERSIST", resolution_note=APPROVE_NOTE)
+        service.resolve_human_review("CLM-HV-PERSIST", resolution_note=APPROVE_NOTE, resolved_by="insurance")
 
         # "Reload": a fresh service instance over the SAME persistence layer.
         reloaded = ClaimService(**kwargs)

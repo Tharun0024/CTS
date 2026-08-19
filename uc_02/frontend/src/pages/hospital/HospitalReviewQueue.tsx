@@ -26,7 +26,7 @@ export function HospitalReviewQueue() {
       setLoading(true);
       setError('');
     }
-    getReviews()
+    getReviews('hospital')
       .then(setReviews)
       .catch(() => {
         if (showLoading) setError('Failed to load review queue.');

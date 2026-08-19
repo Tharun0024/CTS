@@ -28,7 +28,7 @@ function reviewStatus(detail: { status: string; human_resolution?: string | null
 // GET /api/reviews — derived from live backend claim records: claims currently
 // in HUMAN_REVIEW are PENDING; claims carrying a persisted human resolution
 // (already left HUMAN_REVIEW) stay visible as COMPLETED.
-export async function getReviews(): Promise<ReviewItem[]> {
+export async function getReviews(portal?: 'hospital' | 'insurance'): Promise<ReviewItem[]> {
   const claims = await getClaims();
   const details = await Promise.all(
     claims.map((claim) => getClaimDetails(claim.claim_id).catch(() => null))
@@ -40,6 +40,11 @@ export async function getReviews(): Promise<ReviewItem[]> {
     const pending = detail.status === 'HUMAN_REVIEW';
     const resolved = !pending && !!detail.human_resolution;
     if (!pending && !resolved) continue;
+
+    // Filter by portal/flow type
+    if (portal === 'insurance' && !detail.human_verification_pending) continue;
+    if (portal === 'hospital' && detail.human_verification_pending) continue;
+
     items.push({
       review_id: reviewIdForClaim(detail.claim_id),
       claim_id: detail.claim_id,

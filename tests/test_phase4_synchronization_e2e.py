@@ -202,11 +202,11 @@ class TestPriorAuthPrecheckSemantics:
 # ---------------------------------------------------------------------------
 
 class TestHumanVerificationSynchronization:
-    def test_hospital_approve_converges_both_portals_and_survives_refresh(self, hv_registry):
+    def test_insurance_approve_converges_both_portals_and_survives_refresh(self, hv_registry):
         client, _ = _make_client(_rejection_chunks(), exclusions=AGE_EXCLUSIONS)
         client.post("/api/claims", json={"canonical_claim": _rejection_claim("CLM-P4-APP")})
 
-        # Insurance opens the same claim while it is held.
+        # Hospital opens the same claim while it is held.
         held_hospital = client.get("/api/claims/CLM-P4-APP").json()
         held_insurance = client.get("/api/claims/CLM-P4-APP").json()
         _assert_identical_views(held_hospital, held_insurance)
@@ -214,17 +214,17 @@ class TestHumanVerificationSynchronization:
         assert held_hospital["human_verification_pending"] is True
         assert held_hospital["original_rejection"]["confidence_score"] is not None
 
-        # Insurance cannot resolve (read-only, enforced with 403).
+        # Hospital cannot resolve (read-only, enforced with 403).
         denied = client.post(
             "/api/claims/CLM-P4-APP/human-resolution",
-            json={"resolution_note": APPROVE_NOTE, "resolved_by": "insurance"},
+            json={"resolution_note": APPROVE_NOTE, "resolved_by": "hospital"},
         )
         assert denied.status_code == 403
 
-        # Hospital resolves through the single authoritative endpoint.
+        # Insurance resolves through the single authoritative endpoint.
         resolved = client.post(
             "/api/claims/CLM-P4-APP/human-resolution",
-            json={"resolution_note": APPROVE_NOTE, "resolved_by": "hospital"},
+            json={"resolution_note": APPROVE_NOTE, "resolved_by": "insurance"},
         )
         assert resolved.status_code == 200
         assert resolved.json()["status"] == "ACCEPTED"
@@ -246,13 +246,13 @@ class TestHumanVerificationSynchronization:
             assert states[-1] == "APPROVED"
             assert "HUMAN_REVIEW" in states  # the hold happened, then resolved
 
-    def test_hospital_reject_converges_both_portals_and_survives_refresh(self, hv_registry):
+    def test_insurance_reject_converges_both_portals_and_survives_refresh(self, hv_registry):
         client, _ = _make_client(_rejection_chunks(), exclusions=AGE_EXCLUSIONS)
         client.post("/api/claims", json={"canonical_claim": _rejection_claim("CLM-P4-REJ")})
 
         resolved = client.post(
             "/api/claims/CLM-P4-REJ/human-resolution",
-            json={"resolution_note": REJECT_NOTE, "resolved_by": "hospital"},
+            json={"resolution_note": REJECT_NOTE, "resolved_by": "insurance"},
         )
         assert resolved.status_code == 200
         assert resolved.json()["status"] == "REJECTED"
@@ -283,7 +283,7 @@ class TestHumanVerificationSynchronization:
         )
         service = ClaimService(**kwargs)
         service.create_claim(CreateClaimRequest(canonical_claim=_rejection_claim("CLM-P4-RELOAD")))
-        service.resolve_human_review("CLM-P4-RELOAD", resolution_note=APPROVE_NOTE)
+        service.resolve_human_review("CLM-P4-RELOAD", resolution_note=APPROVE_NOTE, resolved_by="insurance")
 
         reloaded = ClaimService(**kwargs)
         view = reloaded.get_claim("CLM-P4-RELOAD")
@@ -361,11 +361,11 @@ class TestSimulationSynchronization:
         held = main_service.get_claim(claim_id)
         assert held["status"] == "HUMAN_REVIEW"
 
-        # Insurance-style resolution is refused; hospital resolution converges.
+        # Hospital-style resolution is refused; insurance resolution converges.
         with pytest.raises(PermissionError):
-            main_service.resolve_human_review(claim_id, resolution_note=APPROVE_NOTE, resolved_by="insurance")
+            main_service.resolve_human_review(claim_id, resolution_note=APPROVE_NOTE, resolved_by="hospital")
         resolved = main_service.resolve_human_review(
-            claim_id, resolution_note=APPROVE_NOTE, resolved_by="hospital"
+            claim_id, resolution_note=APPROVE_NOTE, resolved_by="insurance"
         )
         assert resolved["status"] == "ACCEPTED"
         assert resolved["workflow_state"] == "APPROVED"

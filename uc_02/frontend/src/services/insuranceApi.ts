@@ -40,6 +40,7 @@ function mapClaimToInsurance(detail: ClaimDetails): InsuranceClaim {
     submitted_at: detail.submitted_at,
     updated_at: detail.updated_at,
     priority: priorityByStatus[detail.status] ?? 'LOW',
+    human_verification_pending: detail.human_verification_pending,
   };
 }
 

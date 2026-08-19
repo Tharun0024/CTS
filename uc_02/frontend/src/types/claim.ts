@@ -61,6 +61,7 @@ export interface Claim {
   submitted_at: string;
   updated_at: string;
   workflow_state?: string;
+  human_verification_pending?: boolean;
 }
 
 export interface PolicyEvidenceItem {
@@ -250,6 +251,7 @@ export interface InsuranceClaim {
   updated_at: string;
   priority?: 'HIGH' | 'MEDIUM' | 'LOW';
   workflow_state?: string;
+  human_verification_pending?: boolean;
 }
 
 // Human review queue item

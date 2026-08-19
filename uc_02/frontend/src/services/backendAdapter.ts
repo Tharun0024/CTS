@@ -161,6 +161,7 @@ export interface BackendSummary {
   payer?: string | null;
   policy_id?: string | null;
   simulation_id?: string;
+  human_verification_pending?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -489,5 +490,6 @@ export function toClaimSummary(summary: BackendSummary): Claim {
     updated_at: summary.updated_at ?? '',
     simulation_id: summary.simulation_id,
     workflow_state: summary.workflow_state,
+    human_verification_pending: summary.human_verification_pending ?? false,
   } as Claim & { simulation_id?: string };
 }

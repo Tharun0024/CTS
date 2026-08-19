@@ -44,7 +44,7 @@ export function InsuranceDashboard() {
   const processing = claims.filter(c => ['PROCESSING', 'UNDER_REVIEW', 'SUBMITTED', 'SUBMITTED_AGAIN', 'RESUBMISSION_CHECK', 'DRAFT'].includes(c.status)).length;
   const needsInfo = count('MORE_INFO');
   const rejected = count('REJECTED');
-  const humanReview = claims.filter(c => c.workflow_state === 'HUMAN_REVIEW' || c.status === 'HUMAN_REVIEW').length;
+  const humanReview = claims.filter(c => (c.workflow_state === 'HUMAN_REVIEW' || c.status === 'HUMAN_REVIEW') && c.human_verification_pending === true).length;
 
   const pct = (num: number) => total > 0 ? Math.round((num / total) * 100) : 0;
 

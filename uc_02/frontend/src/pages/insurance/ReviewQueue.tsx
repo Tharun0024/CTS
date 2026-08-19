@@ -15,7 +15,7 @@ export function ReviewQueue() {
       setLoading(true);
       setError('');
     }
-    getReviews()
+    getReviews('insurance')
       .then(setReviews)
       .catch(() => {
         if (showLoading) setError('Failed to load review queue.');

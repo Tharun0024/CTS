@@ -81,6 +81,7 @@ LEGAL_TRANSITIONS: Dict[ClaimWorkflowState, Set[ClaimWorkflowState]] = {
     ClaimWorkflowState.AWAITING_PROVIDER_DECISION: {
         ClaimWorkflowState.RESUBMITTING,                 # provider ACCEPT
         ClaimWorkflowState.HUMAN_REVIEW,                 # provider DECLINE
+        ClaimWorkflowState.REJECTED,                     # provider DECLINE terminal
     },
     ClaimWorkflowState.RESUBMITTING: {
         ClaimWorkflowState.EVALUATING,                   # V(n+1) re-decided by Agent 1
