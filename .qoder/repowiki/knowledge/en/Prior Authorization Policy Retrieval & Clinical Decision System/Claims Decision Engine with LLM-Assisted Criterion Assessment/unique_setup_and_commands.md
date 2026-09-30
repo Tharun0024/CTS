@@ -1,0 +1,1 @@
+LLM provider credentials are auto-loaded from `.env` files located relative to the module directory (searches up to two levels); required keys include `NVIDIA_API_KEY`/`NVIDIA_MODEL`/`NVIDIA_API_URL`, `OPENROUTER_API_KEY`/`OPENROUTER_MODEL`, and `GOOGLE_API_KEY`/`GOOGLE_MODEL`. A `MockLLMProvider` is available for tests to avoid network calls.

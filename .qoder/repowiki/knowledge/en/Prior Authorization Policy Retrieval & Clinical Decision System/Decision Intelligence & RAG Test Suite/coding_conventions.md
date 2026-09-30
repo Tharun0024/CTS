@@ -1,0 +1,6 @@
+- Each test file begins by inserting the repository root into `sys.path` so it can import `decision`, `rag`, `models`, and `api` as top-level packages without installation.
+- Unit tests define reusable fixtures (e.g., `diabetes_policy`, `sample_claim`, `processed_chunks`) via `@pytest.fixture` and build `CaseData`/`EvidenceItem` objects to drive `DecisionAgent.evaluate()` assertions.
+- API tests wrap `api.main.app` in a `@pytest.fixture(scope="module")` `TestClient` so a single HTTP client instance serves all endpoint tests in a file.
+- Smoke/benchmark scripts expose a `run_*` function guarded by `if __name__ == "__main__":` and exit with non-zero status on failure, printing a fixed-format results block.
+- Benchmark failures are classified by scanning `response.errors` strings against keyword markers (malformed JSON, schema validation, null content, HTTP errors, rate limits) rather than raising exceptions.
+- Per-model benchmark outputs are persisted as named JSON artifacts under `tests/` (e.g., `phase4_gemma_benchmark_report.json`, `phase4b_qwen_benchmark_report.json`) keyed by model name.

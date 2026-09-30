@@ -1,0 +1,13 @@
+{
+  "total_lines_read": 24,
+  "valid_json_records": 24,
+  "malformed_json_lines": [],
+  "missing_chunk_ids": [],
+  "missing_policy_ids": [],
+  "empty_text_chunks": [],
+  "missing_sections": [],
+  "duplicate_chunk_ids": {},
+  "inconsistent_payers": [],
+  "malformed_codes": [],
+  "overall_health_status": "PASSED"
+}

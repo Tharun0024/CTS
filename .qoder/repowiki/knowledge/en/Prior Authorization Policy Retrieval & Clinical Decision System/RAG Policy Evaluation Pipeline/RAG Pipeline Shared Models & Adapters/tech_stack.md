@@ -1,0 +1,1 @@
+Pydantic v2 BaseModel schemas for validation; SQLite via lazy `importlib.import_module('sqlite3')` so adapters can be imported even when DB files are absent; regex-based heuristic rule extraction for clinical thresholds (HbA1c, systolic BP, age).

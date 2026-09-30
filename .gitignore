@@ -1,0 +1,21 @@
+# Environment and credentials
+.env
+.env.local
+
+# Python cache / build / testing artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+build/
+dist/
+*.egg-info/
+
+# RAG local caches and model artifacts
+.cache/
+/data/embeddings/
+vector_store/
+cache/
+checkpoints/
+logs/

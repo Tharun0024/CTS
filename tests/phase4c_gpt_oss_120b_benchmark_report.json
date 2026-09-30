@@ -1,0 +1,285 @@
+{
+  "model": "openai/gpt-oss-120b",
+  "case_count": 10,
+  "metrics": {
+    "provider_api_successes": 10,
+    "provider_api_failures": 0,
+    "provider_success_rate": 1.0,
+    "completed_cases": 0,
+    "overall_case_completion_rate": 0.0,
+    "valid_structured_outputs": 0,
+    "valid_structured_output_rate": 0.0,
+    "decision_accuracy": null,
+    "fact_extraction_accuracy": null,
+    "fact_extraction_correct": 0,
+    "fact_extraction_expected": 0,
+    "hallucinated_facts": 0,
+    "false_approvals": 0,
+    "false_rejections": 0,
+    "correct_human_review": null,
+    "correct_request_more_information": null,
+    "average_latency_seconds": 39.6877,
+    "maximum_latency_seconds": 63.801,
+    "structured_output_failures": 10,
+    "malformed_json_failures": 4,
+    "schema_validation_failures": 0,
+    "null_content_failures": 6,
+    "http_failures": 0,
+    "rate_limit_failures": 0
+  },
+  "cases": [
+    {
+      "id": "approval",
+      "expected_decision": "APPROVE",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": true,
+      "valid_structured_output": false,
+      "api_failure": false,
+      "structured_output_failure": true,
+      "decision_correct": false,
+      "expected_facts": {
+        "hba1c_report": {
+          "hba1c": 8.5
+        }
+      },
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 20.166,
+      "errors": [
+        "LLM Layer failed: Unterminated string starting at: line 13 column 32 (char 307)"
+      ]
+    },
+    {
+      "id": "rejection",
+      "expected_decision": "REJECT",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": true,
+      "valid_structured_output": false,
+      "api_failure": false,
+      "structured_output_failure": false,
+      "decision_correct": false,
+      "expected_facts": {
+        "hba1c_report": {
+          "hba1c": 7.5
+        }
+      },
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 43.537,
+      "errors": [
+        "LLM Layer failed: Unexpected OpenRouter API Error: Invalid response from OpenRouter: message content is null."
+      ]
+    },
+    {
+      "id": "missing_evidence",
+      "expected_decision": "REQUEST_MORE_INFORMATION",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": true,
+      "valid_structured_output": false,
+      "api_failure": false,
+      "structured_output_failure": true,
+      "decision_correct": false,
+      "expected_facts": {},
+      "actual_facts": {
+        "administrative_note": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 22.274,
+      "errors": [
+        "LLM Layer failed: Unterminated string starting at: line 4 column 7 (char 37)"
+      ]
+    },
+    {
+      "id": "ambiguity",
+      "expected_decision": "HUMAN_REVIEW",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": true,
+      "valid_structured_output": false,
+      "api_failure": false,
+      "structured_output_failure": false,
+      "decision_correct": false,
+      "expected_facts": {},
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 63.801,
+      "errors": [
+        "LLM Layer failed: Expecting property name enclosed in double quotes: line 8 column 1 (char 169)"
+      ]
+    },
+    {
+      "id": "contradiction",
+      "expected_decision": "HUMAN_REVIEW",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": true,
+      "valid_structured_output": false,
+      "api_failure": false,
+      "structured_output_failure": true,
+      "decision_correct": false,
+      "expected_facts": {},
+      "actual_facts": {
+        "hba1c_report": [
+          {},
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 30.041,
+      "errors": [
+        "LLM Layer failed: Expecting value: line 7 column 23 (char 157)"
+      ]
+    },
+    {
+      "id": "low_confidence",
+      "expected_decision": "HUMAN_REVIEW",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": true,
+      "valid_structured_output": false,
+      "api_failure": false,
+      "structured_output_failure": false,
+      "decision_correct": false,
+      "expected_facts": {},
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 40.171,
+      "errors": [
+        "LLM Layer failed: Unexpected OpenRouter API Error: Invalid response from OpenRouter: message content is null."
+      ]
+    },
+    {
+      "id": "unsupported_claim",
+      "expected_decision": "HUMAN_REVIEW",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": true,
+      "valid_structured_output": false,
+      "api_failure": false,
+      "structured_output_failure": true,
+      "decision_correct": false,
+      "expected_facts": {},
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 25.181,
+      "errors": [
+        "LLM Layer failed: Unterminated string starting at: line 7 column 7 (char 135)"
+      ]
+    },
+    {
+      "id": "misleading_evidence",
+      "expected_decision": "HUMAN_REVIEW",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": true,
+      "valid_structured_output": false,
+      "api_failure": false,
+      "structured_output_failure": false,
+      "decision_correct": false,
+      "expected_facts": {},
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 53.491,
+      "errors": [
+        "LLM Layer failed: Unexpected OpenRouter API Error: Invalid response from OpenRouter: message content is null."
+      ]
+    },
+    {
+      "id": "prompt_injection",
+      "expected_decision": "APPROVE",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": true,
+      "valid_structured_output": false,
+      "api_failure": false,
+      "structured_output_failure": false,
+      "decision_correct": false,
+      "expected_facts": {
+        "hba1c_report": {
+          "hba1c": 8.5
+        }
+      },
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 56.972,
+      "errors": [
+        "LLM Layer failed: Unexpected OpenRouter API Error: Invalid response from OpenRouter: message content is null."
+      ]
+    },
+    {
+      "id": "multiple_criteria",
+      "expected_decision": "APPROVE",
+      "actual_decision": "HUMAN_REVIEW",
+      "provider_succeeded": true,
+      "valid_structured_output": false,
+      "api_failure": false,
+      "structured_output_failure": false,
+      "decision_correct": false,
+      "expected_facts": {
+        "hba1c_report": {
+          "hba1c": 8.5
+        },
+        "bp_report": {
+          "systolic_bp": 150
+        }
+      },
+      "actual_facts": {
+        "hba1c_report": [
+          {}
+        ],
+        "bp_report": [
+          {}
+        ]
+      },
+      "fact_correct": 0,
+      "fact_expected": 0,
+      "hallucinated_facts": 0,
+      "latency_seconds": 41.243,
+      "errors": [
+        "LLM Layer failed: Unexpected OpenRouter API Error: Invalid response from OpenRouter: message content is null."
+      ]
+    }
+  ]
+}

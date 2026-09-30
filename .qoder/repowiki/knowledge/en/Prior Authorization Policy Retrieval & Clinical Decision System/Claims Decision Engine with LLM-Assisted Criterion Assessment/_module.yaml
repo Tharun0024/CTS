@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: decision_engine
+title: Claims Decision Engine with LLM-Assisted Criterion Assessment
+scope:
+    - decision/
+source_files: []
+depends_on: []
+related_to: []

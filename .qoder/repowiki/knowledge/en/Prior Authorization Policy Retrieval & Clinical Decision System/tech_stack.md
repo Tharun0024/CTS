@@ -1,0 +1,1 @@
+Python 3.12+ with FastAPI + uvicorn for the API surface; PyTorch + Transformers + SentenceTransformers (BGE) for embeddings; FAISS for vector search and rank-bm25 for keyword retrieval; Pydantic v2 for shared data contracts across RAG, decision engine, and API schemas; OpenRouter and NVIDIA's OpenAI-compatible APIs for LLM calls; pytest + httpx for testing.

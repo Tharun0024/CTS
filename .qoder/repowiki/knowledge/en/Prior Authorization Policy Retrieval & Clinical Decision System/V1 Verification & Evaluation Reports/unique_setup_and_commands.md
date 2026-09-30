@@ -1,0 +1,1 @@
+The primary report is produced by running `python scripts/verify_v1_final.py > reports/v1_final_run.txt`; it requires `NVIDIA_API_KEY` and optionally `LLM_API_KEY`/`LLM_MODEL` to be set in the environment before execution.

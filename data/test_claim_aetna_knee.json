@@ -1,0 +1,20 @@
+{
+  "claim_id": "test_aetna_knee",
+  "insurance": {
+    "primary": {
+      "payer": "Aetna",
+      "policy_id": null
+    }
+  },
+  "diagnosis": [
+    {
+      "code": "M17.11",
+      "description": "Unilateral post-traumatic osteoarthritis, right knee"
+    }
+  ],
+  "procedure": {
+    "code": "27447",
+    "description": "Arthroplasty, knee, condyle and plateau; total knee arthroplasty."
+  },
+  "clinical_domain": "orthopedics"
+}

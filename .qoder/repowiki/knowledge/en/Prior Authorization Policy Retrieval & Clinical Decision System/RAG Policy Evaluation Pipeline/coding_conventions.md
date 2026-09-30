@@ -1,0 +1,4 @@
+- Each pipeline stage lives in its own subpackage under `rag/` exposing a single class/function plus an `__init__.py` re-export.
+- Inter-stage data flows use the Pydantic models in `models/rag_models.py` rather than raw dicts, ensuring type-checked handoffs between stages.
+- Adapters in `adapters/` perform one-way normalization of external payloads into the shared `ClaimInput`/`ClaimOutput` schemas before entering or after exiting the pipeline.
+- Policy/criterion rule tables (e.g., `CRITERIA_RULES_REGISTRY`, `CPT_MAP`, `DIAG_MAP`) are kept as module-level constants in adapters instead of being embedded in individual stages.

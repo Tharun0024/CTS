@@ -1,0 +1,1 @@
+Python scripts using PyYAML for config, numpy for latency stats, FAISS for vector search, BM25 keyword indexing, BGE embedding/reranking models, OpenAI-compatible LLMClient (with mock fallback), and NVIDIAProvider for Agent-1 criterion assessment; SQLite is queried directly in `verify_v1_final.py` for provider/payer DB integrity checks.

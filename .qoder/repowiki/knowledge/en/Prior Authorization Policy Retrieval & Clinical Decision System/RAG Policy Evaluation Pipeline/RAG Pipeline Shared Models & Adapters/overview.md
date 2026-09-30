@@ -1,0 +1,1 @@
+Defines Pydantic schemas for RAG claim inputs/outputs and provides adapters that normalize provider/payer data, canonical claims, and RAG results into the Agent-1 policy contract.

@@ -1,0 +1,1 @@
+Artifacts from the V1 end-to-end verification run of the claims adjudication pipeline, including dataset profiling, RAG retrieval evaluation, benchmark results, and a human-readable scenario pass/fail log.

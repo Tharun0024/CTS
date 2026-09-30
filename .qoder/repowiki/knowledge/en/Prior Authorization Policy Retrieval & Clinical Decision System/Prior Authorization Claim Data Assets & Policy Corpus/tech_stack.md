@@ -1,0 +1,1 @@
+SQLite databases (`big_patient_data.db`, `payer_data.db`), Excel/CSV spreadsheets, JSONL policy corpus, FAISS vector index with BM25 hybrid retrieval, and NumPy float embeddings for semantic search over CMS NCD/LCD and Aetna CPB policy text.

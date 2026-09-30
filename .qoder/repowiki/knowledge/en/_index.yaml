@@ -1,0 +1,115 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: en-US
+branch: mock
+nodes_managed: true
+exported_at: "2026-08-16T12:05:58Z"
+modules:
+    "":
+        dir_name: Prior Authorization Policy Retrieval & Clinical Decision System
+        title: Prior Authorization Policy Retrieval & Clinical Decision System
+        scope:
+            - README.md
+            - requirements.txt
+            - .gitignore
+            - .env.example
+            - AGENT2_INSPECTION_REPORT.md
+        source_files: []
+        children:
+            - agent2_orchestrator
+            - data_assets
+            - decision_engine
+            - rag_pipeline
+            - reports
+            - scripts
+            - services_and_transformation
+            - tests
+        depends_on: []
+        related_to: []
+    agent2_orchestrator:
+        dir_name: Provider-Side Prior Authorization Orchestrator (Agent 2)
+        title: Provider-Side Prior Authorization Orchestrator (Agent 2)
+        scope:
+            - agent2/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    data_assets:
+        dir_name: Prior Authorization Claim Data Assets & Policy Corpus
+        title: Prior Authorization Claim Data Assets & Policy Corpus
+        scope:
+            - data/
+            - DATA-VERSION1/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    decision_engine:
+        dir_name: Claims Decision Engine with LLM-Assisted Criterion Assessment
+        title: Claims Decision Engine with LLM-Assisted Criterion Assessment
+        scope:
+            - decision/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    rag_pipeline:
+        dir_name: RAG Policy Evaluation Pipeline
+        title: RAG Policy Evaluation Pipeline
+        scope:
+            - rag/
+            - models/
+            - adapters/
+        source_files: []
+        children:
+            - rag_pipeline/shared_models_adapters
+        depends_on: []
+        related_to: []
+    rag_pipeline/shared_models_adapters:
+        dir_name: RAG Pipeline Shared Models & Adapters
+        title: RAG Pipeline Shared Models & Adapters
+        scope:
+            - models/
+            - adapters/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    reports:
+        dir_name: V1 Verification & Evaluation Reports
+        title: V1 Verification & Evaluation Reports
+        scope:
+            - reports/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    scripts:
+        dir_name: RAG Pipeline Scripts (Build, Benchmark, Evaluate & Verify)
+        title: RAG Pipeline Scripts (Build, Benchmark, Evaluate & Verify)
+        scope:
+            - scripts/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    services_and_transformation:
+        dir_name: Integrated Claim Pipeline & Canonical Claim Transformation
+        title: Integrated Claim Pipeline & Canonical Claim Transformation
+        scope:
+            - services/
+            - transformation/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    tests:
+        dir_name: Decision Intelligence & RAG Test Suite
+        title: Decision Intelligence & RAG Test Suite
+        scope:
+            - tests/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []

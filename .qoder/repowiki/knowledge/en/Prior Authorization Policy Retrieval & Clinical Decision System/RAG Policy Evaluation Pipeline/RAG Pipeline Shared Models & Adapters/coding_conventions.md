@@ -1,0 +1,6 @@
+- Adapters validate non-null inputs at function entry by raising `ValueError` with a descriptive message before any processing.
+- Ambiguous or missing fields are resolved through explicit mapping tables (`CPT_MAP`, `DIAG_MAP`, `EVIDENCE_TYPE_KEY_MAP`, `PAYER_NAME_ALIASES`, `EXPLICIT_EVIDENCE_MAP`, `CRITERIA_RULES_REGISTRY`) rather than ad-hoc branching.
+- Flexible incoming shapes are normalized via helper coercers (`_coerce_list`, `_json_list`, `_extract_diagnosis_codes`, `_coerce_int`) that accept multiple types and fall back safely.
+- Database access uses parameterized queries with `?` placeholders and lazy `sqlite3` imports inside `_connect`/`_fetch_one`/`_fetch_all`, with connection cleanup in `finally` blocks and module removal via `_cleanup_sqlite_module`.
+- Canonical claim construction keeps payer context separate from clinical evidence, attaching it later through `attach_payer_context` instead of merging during initial fetch.
+- Fallback identifiers use sentinel strings like `UNKNOWN-POLICY`, `UNKNOWN-CLAIM`, `UNKNOWN-CRITERION`, and `__unresolved_rule_guard__` to preserve traceability when source data is missing.

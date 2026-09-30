@@ -1,0 +1,1 @@
+Pytest-based unit, integration, and smoke tests for the decision agent, policy evaluation, RAG pipeline, and FastAPI endpoints, plus live OpenRouter model benchmarks.

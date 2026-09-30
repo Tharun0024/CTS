@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: rag_pipeline/shared_models_adapters
+title: RAG Pipeline Shared Models & Adapters
+scope:
+    - models/
+    - adapters/
+source_files: []
+depends_on: []
+related_to: []
