@@ -42,10 +42,13 @@ export function InsuranceClaimDetails() {
   // Poll while non-terminal
   usePolling(
     () => getInsuranceClaimDetails(id!),
-    (data) => setClaim(data),
-    (data) => isTerminalStatus(data.status),
-    5000,
-    !!id && !!claim && !isTerminalStatus(claim.status)
+    (data) => {
+      setClaim(data);
+      setError('');
+    },
+    (data) => isTerminalStatus(data.status) && data.workflow_state !== 'HUMAN_REVIEW',
+    5005,
+    !!id && (!claim || !isTerminalStatus(claim.status) || claim.workflow_state === 'HUMAN_REVIEW')
   );
 
   if (loading) return (
@@ -333,7 +336,7 @@ export function InsuranceClaimDetails() {
 
         {/* Right: Decision Panel + Timeline + policy reference + documents */}
         <div className="space-y-4">
-          {claim.status === 'HUMAN_REVIEW' && (
+          {(claim.status === 'HUMAN_REVIEW' || claim.workflow_state === 'HUMAN_REVIEW') && (
             claim.human_verification_pending ? (
               <InsuranceHumanResolutionPanel claim={claim} onResolved={fetchClaim} />
             ) : (

@@ -248,7 +248,7 @@ class WorkflowControlPlane:
         if claim_version is None:
             claim_version = self._versions.get(claim_id, 1)
         event = WorkflowEvent(
-            seq=len(self._events) + 1,
+            seq=len(self.events(claim_id)) + 1,
             claim_id=claim_id,
             claim_version=claim_version,
             state_before=from_state.value,
@@ -451,14 +451,13 @@ class WorkflowControlPlane:
         return tuple(r for r in self._provider_decisions if r.claim_id == claim_id)
 
     # -- persistence ---------------------------------------------------------
-
     def _persist_event(self, event: WorkflowEvent) -> None:
         if not self._persist_db:
             return
         from ..database.repositories.audit_repository import AuditRepository
 
         AuditRepository().log_audit(
-            audit_id=f"AUD-{uuid.uuid4().hex[:8].upper()}",
+            audit_id=f"AUD-{event.claim_id}-{event.seq}",
             correlation_id=event.correlation_id or "",
             claim_id=event.claim_id,
             claim_version=event.claim_version,
@@ -470,7 +469,6 @@ class WorkflowControlPlane:
                 + (f" | {event.detail}" if event.detail else "")
             ),
         )
-
     def _persist_provider_decision(self, record: ProviderDecisionRecord) -> None:
         if not self._persist_db:
             return

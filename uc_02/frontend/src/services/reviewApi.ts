@@ -20,8 +20,9 @@ export function claimIdForReview(reviewId: string): string {
   return reviewId.replace(/^REV-/, '');
 }
 
-function reviewStatus(detail: { status: string; human_resolution?: string | null }): 'PENDING' | 'COMPLETED' {
-  if (detail.status !== 'HUMAN_REVIEW' && detail.human_resolution) return 'COMPLETED';
+function reviewStatus(detail: { status: string; workflow_state?: string; human_resolution?: string | null }): 'PENDING' | 'COMPLETED' {
+  const pending = detail.status === 'HUMAN_REVIEW' || detail.workflow_state === 'HUMAN_REVIEW';
+  if (!pending && detail.human_resolution) return 'COMPLETED';
   return 'PENDING';
 }
 
@@ -37,7 +38,7 @@ export async function getReviews(portal?: 'hospital' | 'insurance'): Promise<Rev
   const items: ReviewItem[] = [];
   for (const detail of details) {
     if (!detail) continue;
-    const pending = detail.status === 'HUMAN_REVIEW';
+    const pending = detail.status === 'HUMAN_REVIEW' || detail.workflow_state === 'HUMAN_REVIEW';
     const resolved = !pending && !!detail.human_resolution;
     if (!pending && !resolved) continue;
 

@@ -160,8 +160,8 @@ class TestPriorAuthPrecheckSemantics:
         assert precheck["matched_rule"] == "PA-RULE-POLICY-CORPUS"
         assert precheck["policy_reference"] == "POL-HV"
         assert precheck["reason"]
-        # REQUIRED preserves the existing Phase 3 hold semantics exactly.
-        assert body["status"] == "HUMAN_REVIEW"
+        # Visibly labelled REJECTED (non-terminal).
+        assert body["status"] == "REJECTED"
         assert body["human_verification_pending"] is True
         assert body["decision"]["outcome"] == "REJECT"
 
@@ -210,7 +210,7 @@ class TestHumanVerificationSynchronization:
         held_hospital = client.get("/api/claims/CLM-P4-APP").json()
         held_insurance = client.get("/api/claims/CLM-P4-APP").json()
         _assert_identical_views(held_hospital, held_insurance)
-        assert held_hospital["status"] == "HUMAN_REVIEW"
+        assert held_hospital["status"] == "REJECTED"
         assert held_hospital["human_verification_pending"] is True
         assert held_hospital["original_rejection"]["confidence_score"] is not None
 
@@ -331,7 +331,7 @@ class TestSimulationSynchronization:
         assert by_scenario["MISSING"]["claim_status"] == "ACCEPTED"
         assert by_scenario["MISSING"]["decision_outcome"] == "APPROVE"
         # NOT_SATISFIED -> HUMAN_REVIEW hold (Phase 3 semantics inside simulation).
-        assert by_scenario["NOT_SATISFIED"]["claim_status"] == "HUMAN_REVIEW"
+        assert by_scenario["NOT_SATISFIED"]["claim_status"] == "REJECTED"
         assert by_scenario["NOT_SATISFIED"]["decision_outcome"] == "REJECT"
 
         # Simulation summaries and full records come from the SAME owning
@@ -359,7 +359,7 @@ class TestSimulationSynchronization:
         main_service = ClaimService(components=_build_components(_sim_chunks()))
         main_service.simulation_service_locator = manager.service_for_claim
         held = main_service.get_claim(claim_id)
-        assert held["status"] == "HUMAN_REVIEW"
+        assert held["status"] == "REJECTED"
 
         # Hospital-style resolution is refused; insurance resolution converges.
         with pytest.raises(PermissionError):

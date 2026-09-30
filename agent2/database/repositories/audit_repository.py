@@ -10,12 +10,16 @@ class AuditRepository:
         conn = get_db_connection()
         cursor = conn.cursor()
         now = datetime.utcnow().isoformat() + "Z"
-        cursor.execute("""
-        INSERT INTO agent2_audit (audit_id, correlation_id, claim_id, claim_version, state_before, state_after, action, timestamp, result, error)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-        """, (audit_id, correlation_id, claim_id, claim_version, state_before, state_after, action, now, result, error))
-        conn.commit()
-        conn.close()
+        try:
+            cursor.execute("""
+            INSERT INTO agent2_audit (audit_id, correlation_id, claim_id, claim_version, state_before, state_after, action, timestamp, result, error)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """, (audit_id, correlation_id, claim_id, claim_version, state_before, state_after, action, now, result, error))
+            conn.commit()
+        except sqlite3.IntegrityError:
+            conn.rollback()
+        finally:
+            conn.close()
 
     def get_audit_trail(self, claim_id: str):
         conn = get_db_connection()

@@ -48,6 +48,7 @@ from .mapping import (
     serialize_version,
 )
 from .schemas import CreateClaimRequest
+from agent2.workflow.control_plane import ClaimWorkflowState, WorkflowControlPlane
 
 
 class ClaimNotFound(KeyError):
@@ -72,8 +73,6 @@ class ClaimService:
         persist_workflow_db: bool = False,
         simulation_service_locator=None,
     ):
-        from agent2.workflow.control_plane import WorkflowControlPlane
-
         # components may be injected later (api/main.py lifespan).
         self.components = components
         self.recovery_source = recovery_source
@@ -129,6 +128,7 @@ class ClaimService:
     def list_claims(self) -> List[Dict[str, Any]]:
         summaries = []
         for record in self.claim_store.list():
+            record = self._with_live_views(record)
             decision = record.get("decision") or {}
             canonical = record.get("canonical_claim") or {}
             case_data = canonical.get("case_data") or {}
@@ -267,7 +267,8 @@ class ClaimService:
                 resolved_by=resolved_by,
             )
         record = self._require_claim(claim_id)
-        if record.get("status") == "HUMAN_REVIEW":
+        workflow_state = record.get("workflow_state")
+        if workflow_state in ("HUMAN_REVIEW", ClaimWorkflowState.HUMAN_REVIEW):
             is_verification = bool(record.get("human_verification_pending"))
 
             if is_verification:
@@ -366,13 +367,22 @@ class ClaimService:
             or "UNKNOWN"
         )
 
+        decision = serialize_decision(result.final_decision) or {}
+        human_verification_pending = bool(
+            getattr(result, "human_verification_pending", False)
+        )
+        status = map_claim_status(state)
+        if state == ClaimWorkflowState.HUMAN_REVIEW and human_verification_pending:
+            if decision.get("status") in ("REJECT", "REJECTED") or decision.get("outcome") in ("REJECT", "REJECTED"):
+                status = "REJECTED"
+
         return {
             "claim_id": claim_id,
             "patient_id": patient_id,
-            "status": map_claim_status(state),
+            "status": status,
             "workflow_state": state.value,
             "claim_version": cp.current_version(claim_id),
-            "decision": serialize_decision(result.final_decision),
+            "decision": decision,
             "agent2_invoked": result.agent2_invoked,
             "resubmissions": result.resubmissions,
             "human_review_required": result.human_review_required,
@@ -380,9 +390,7 @@ class ClaimService:
             # Phase 3 human verification of Agent1 REJECT: pending flag,
             # immutable original rejection snapshot, and the applied human
             # resolution (None until the hospital resolves the hold).
-            "human_verification_pending": bool(
-                getattr(result, "human_verification_pending", False)
-            ),
+            "human_verification_pending": human_verification_pending,
             "original_rejection": getattr(result, "original_rejection", None),
             "human_resolution": getattr(result, "human_resolution", None),
             "sensitive_blocked": result.sensitive_blocked,
@@ -466,7 +474,14 @@ class ClaimService:
         enriched = dict(record)
         state = self.control_plane.current_state(claim_id)
         enriched["workflow_state"] = state.value
-        enriched["status"] = map_claim_status(state)
+        
+        status = map_claim_status(state)
+        human_verification_pending = enriched.get("human_verification_pending")
+        decision = enriched.get("decision") or {}
+        if state == ClaimWorkflowState.HUMAN_REVIEW and human_verification_pending:
+            if decision.get("status") in ("REJECT", "REJECTED") or decision.get("outcome") in ("REJECT", "REJECTED"):
+                status = "REJECTED"
+        enriched["status"] = status
         enriched["claim_version"] = self.control_plane.current_version(claim_id)
         enriched["timeline"] = [
             serialize_event(e) for e in self.control_plane.events(claim_id)

@@ -347,7 +347,7 @@ class TestLifecycleAndPipelineReuse:
         # NOT_SATISFIED: real Agent1 REJECT, held for human cross-verification
         # (Phase 3: never immediately REJECTED).
         assert patients[2]["decision_outcome"] == "REJECT"
-        assert patients[2]["claim_status"] == "HUMAN_REVIEW"
+        assert patients[2]["claim_status"] == "REJECTED"
 
         # The records live in a REAL ClaimService store (Phase 5A contract):
         runtime = manager._runtimes[record["simulation_id"]]

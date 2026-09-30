@@ -40,9 +40,9 @@ export function ReviewDetail() {
   usePolling(
     () => getReviewDetails(id!),
     (data) => setReview(data),
-    (data) => isTerminalStatus(data.claim_details.status),
-    5000,
-    !!id && !!review && !isTerminalStatus(review.claim_details.status)
+    (data) => isTerminalStatus(data.claim_details.status) && data.claim_details.workflow_state !== 'HUMAN_REVIEW',
+    5005,
+    !!id && !!review && (!isTerminalStatus(review.claim_details.status) || review.claim_details.workflow_state === 'HUMAN_REVIEW')
   );
 
   if (loading) return (
@@ -140,7 +140,7 @@ export function ReviewDetail() {
           {/* Phase 4: the pending panel is gated on the live backend status so a
               stale HUMAN_REVIEW hold can never reappear after the hospital
               resolves; resolved claims show the terminal decision instead. */}
-          {claim.status === 'HUMAN_REVIEW' ? (
+          {(claim.status === 'HUMAN_REVIEW' || claim.workflow_state === 'HUMAN_REVIEW') ? (
             claim.agent2_invoked ? (
               <div className="bg-amber-50 border border-amber-250 rounded-2xl p-4.5 text-center shadow-sm animate-fade-in-up">
                 <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2" />

@@ -50,10 +50,13 @@ export function HospitalClaimDetails() {
 
   usePolling(
     () => getClaimDetails(id!),
-    (data) => setClaim(data),
-    (data) => isTerminalStatus(data.status),
-    5000,
-    !!id && !!claim && !isTerminalStatus(claim.status)
+    (data) => {
+      setClaim(data);
+      setError('');
+    },
+    (data) => isTerminalStatus(data.status) && data.workflow_state !== 'HUMAN_REVIEW',
+    5005,
+    !!id && (!claim || !isTerminalStatus(claim.status) || claim.workflow_state === 'HUMAN_REVIEW')
   );
 
   if (loading) return (
@@ -188,6 +191,14 @@ export function HospitalClaimDetails() {
                           )}
                         </div>
                       </div>
+                      {claim.human_resolution && (
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Applied Human Resolution</span>
+                          <div className="text-xs text-slate-700 leading-relaxed bg-rose-50 p-2.5 rounded border border-rose-100 font-medium whitespace-pre-wrap mt-0.5 shadow-sm">
+                            {claim.human_resolution}
+                          </div>
+                        </div>
+                      )}
                       {claim.decision?.criterion_assessments && (
                         <div>
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Required Evidence Paths</span>

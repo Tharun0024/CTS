@@ -21,7 +21,11 @@ export function InsuranceDashboard() {
       setError('');
     }
     Promise.all([getInsuranceClaims(), getReviews()])
-      .then(([c, r]) => { setClaims(c); setReviews(r); })
+      .then(([c, r]) => {
+        setClaims(c);
+        setReviews(r);
+        setError('');
+      })
       .catch(() => {
         if (showLoading) setError('Failed to load dashboard data.');
       })

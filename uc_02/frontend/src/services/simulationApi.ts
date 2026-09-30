@@ -48,7 +48,7 @@ export async function startSimulationTrigger(
       method: 'POST',
       body: JSON.stringify({
         source: payload.source,
-        pause_seconds: 45.0, // UI simulation runs are paced at 45s per patient
+        pause_seconds: 20.0, // UI simulation runs are paced at 20s per patient
       }),
     });
   } catch (error) {

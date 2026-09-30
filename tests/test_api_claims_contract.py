@@ -212,9 +212,8 @@ class TestCreateAndRetrieve:
         claim = _scenario_claim("CLM-API-REJ", "POL-API-EX", age=85)
 
         body = client.post("/api/claims", json={"canonical_claim": claim}).json()
-        # Phase 3: REJECT is held for human cross-verification, never
-        # immediately REJECTED; the original rejection stays visible.
-        assert body["status"] == "HUMAN_REVIEW"
+        # Visibly labelled REJECTED (non-terminal).
+        assert body["status"] == "REJECTED"
         assert body["workflow_state"] == "HUMAN_REVIEW"
         assert body["human_verification_pending"] is True
         assert body["decision"]["outcome"] == "REJECT"

@@ -729,13 +729,12 @@ def run_agent2_v1_pipeline(
     provider_declined = False
     human_verification_pending = False
     original_rejection: Optional[Dict[str, Any]] = None
-    human_resolution: Optional[str] = None
-
+    from agent2.reasoning.rejection_analyzer import RejectionAnalyzer
     analyzer = RejectionAnalyzer()
-
     # Phase 4 control plane: enforced legal transitions + immutable events.
     cp = control_plane or WorkflowControlPlane(persist_db=persist_workflow_db)
     wf_claim_id = str(canonical_claim.get("claim_id") or "UNKNOWN-CLAIM")
+    human_resolution = _latest_reentry_resolution_note(cp, wf_claim_id) or _latest_human_resolution_note(cp, wf_claim_id)
     # Version continuity across runs sharing one control plane (re-entry).
     wf_version_offset = max(0, cp.current_version(wf_claim_id) - 1)
     resubmissions = wf_version_offset

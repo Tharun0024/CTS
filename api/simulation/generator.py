@@ -24,7 +24,13 @@ from typing import Any, Dict, List, Optional
 #   MISSING_EVIDENCE  - a required evidence item is absent at submission but
 #                       exists in the provider pool (Agent2 may recover it)
 #   NOT_SATISFIED     - documentation present but the clinical rule fails
-SCENARIOS = ("COMPLETE", "MISSING_EVIDENCE", "NOT_SATISFIED")
+SCENARIOS = (
+    "COMPLETE",
+    "NOT_SATISFIED",
+    "MISSING_EVIDENCE",
+    "MISSING_EVIDENCE",
+    "HUMAN_REVIEW_ESCALATION",
+)
 
 class DefaultPatientFactory:
     """Deterministic per-run patient factory.
@@ -83,6 +89,9 @@ class DefaultPatientFactory:
         else:
             target_payer = "Aetna"
             target_cpt = "27447"
+
+        if scenario == "HUMAN_REVIEW_ESCALATION":
+            target_payer = "unknown"
 
         # 3. Sourcing real claim and patient details from the database
         from adapters.runtime_adapter import RuntimeAdapter

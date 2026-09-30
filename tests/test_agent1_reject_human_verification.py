@@ -137,8 +137,8 @@ class TestRejectRoutesToHumanVerification:
         client, _ = _make_client(_rejection_chunks(), exclusions=AGE_EXCLUSIONS)
         body = client.post("/api/claims", json={"canonical_claim": _rejection_claim("CLM-HV-API")}).json()
 
-        # Never REJECTED before human verification completes.
-        assert body["status"] == "HUMAN_REVIEW"
+        # Visibly labelled REJECTED (non-terminal).
+        assert body["status"] == "REJECTED"
         assert body["workflow_state"] == "HUMAN_REVIEW"
         assert body["human_verification_pending"] is True
         # Original Agent 1 rejection stays visible + immutable.
@@ -256,7 +256,7 @@ class TestHospitalCannotResolve:
             )
         # State untouched: still pending human verification.
         held = service.get_claim("CLM-HV-INS")
-        assert held["status"] == "HUMAN_REVIEW"
+        assert held["status"] == "REJECTED"
         assert held["human_verification_pending"] is True
         assert held["human_resolution"] is None
 
@@ -270,7 +270,7 @@ class TestHospitalCannotResolve:
         )
         assert response.status_code == 403
         body = client.get("/api/claims/CLM-HV-403").json()
-        assert body["status"] == "HUMAN_REVIEW"
+        assert body["status"] == "REJECTED"
         assert body["human_verification_pending"] is True
 
 

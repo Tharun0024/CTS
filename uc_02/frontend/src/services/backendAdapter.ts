@@ -196,15 +196,6 @@ export function toFrontendStatus(record: {
   decision_status?: string | null; 
   decision?: { status?: string; outcome?: string } | null 
 }): ClaimStatus {
-  const isOriginallyRejected = record.original_rejection || 
-    record.decision_status === 'REJECT' || 
-    record.decision_status === 'REJECTED' || 
-    record.decision?.status === 'REJECT' || 
-    record.decision?.status === 'REJECTED';
-    
-  if (record.workflow_state === 'HUMAN_REVIEW' && isOriginallyRejected) {
-    return 'REJECTED';
-  }
   if (record.status && KNOWN_FRONTEND_STATUSES.has(record.status)) {
     return record.status as ClaimStatus;
   }

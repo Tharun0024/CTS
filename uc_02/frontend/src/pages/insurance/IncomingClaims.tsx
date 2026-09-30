@@ -21,7 +21,10 @@ export function IncomingClaims() {
       setError('');
     }
     getInsuranceClaims()
-      .then(setClaims)
+      .then((c) => {
+        setClaims(c);
+        setError('');
+      })
       .catch(() => {
         if (showLoading) setError('Failed to load claims.');
       })
